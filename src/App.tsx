@@ -1,7 +1,9 @@
+import { SceneCanvas } from './components/Scene/SceneCanvas'
+
 function App() {
   return (
-    <div>
-      <h1>Shadow Simulator</h1>
+    <div style={{ width: '100vw', height: '100vh', display: 'flex' }}>
+      <SceneCanvas />
     </div>
   )
 }
