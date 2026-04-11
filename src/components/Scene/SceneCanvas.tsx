@@ -3,7 +3,9 @@ import { Ground } from './Ground'
 import { SunLight } from './SunLight'
 import { SunIndicator } from './SunIndicator'
 import { CameraControls } from './CameraControls'
+import { BuildingGroup } from '../Buildings/BuildingGroup'
 import { useSunPosition } from '../../hooks/useSunPosition'
+import { useStore } from '../../store/useStore'
 
 function SkyBackground() {
   const { isNight } = useSunPosition()
@@ -14,6 +16,8 @@ function SkyBackground() {
 }
 
 export function SceneCanvas() {
+  const selectBuilding = useStore(s => s.selectBuilding)
+
   return (
     <div style={{ flex: 1, position: 'relative' }}>
       <Canvas
@@ -22,7 +26,8 @@ export function SceneCanvas() {
       >
         <SkyBackground />
         <SunLight />
-        <Ground />
+        <Ground onClick={() => selectBuilding(null)} />
+        <BuildingGroup />
         <SunIndicator />
         <CameraControls />
       </Canvas>

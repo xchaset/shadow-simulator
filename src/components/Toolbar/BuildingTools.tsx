@@ -1,0 +1,30 @@
+import { BUILDING_PRESETS, createBuilding } from '../../utils/buildings'
+import { useStore } from '../../store/useStore'
+import type { BuildingType } from '../../types'
+import { Button, Tooltip } from 'antd'
+
+export function BuildingTools() {
+  const addBuilding = useStore(s => s.addBuilding)
+
+  const handleAdd = (type: BuildingType) => {
+    // Place at a slightly random position to avoid stacking
+    const offset = (Math.random() - 0.5) * 40
+    const b = createBuilding(type, [offset, offset])
+    addBuilding(b)
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      {(Object.entries(BUILDING_PRESETS) as [BuildingType, any][]).map(([type, preset]) => (
+        <Tooltip key={type} title={preset.label}>
+          <Button
+            size="small"
+            onClick={() => handleAdd(type)}
+          >
+            {preset.icon}
+          </Button>
+        </Tooltip>
+      ))}
+    </div>
+  )
+}
