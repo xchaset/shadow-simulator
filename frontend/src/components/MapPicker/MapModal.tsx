@@ -32,7 +32,7 @@ export function MapModal({ open, onClose }: Props) {
 
   return (
     <Modal
-      title="📍 选择地点"
+      title={<span><EnvironmentOutlined /> 选择地点</span>}
       open={open}
       onCancel={onClose}
       onOk={handleConfirm}
@@ -62,7 +62,7 @@ export function MapModal({ open, onClose }: Props) {
         marginBottom: 16,
         border: '1px dashed #d9d9d9',
       }}>
-        🗺️ 地图区域（配置 VITE_AMAP_KEY 后启用）
+        地图区域（配置 VITE_AMAP_KEY 后启用）
       </div>
 
       <Space size="middle">

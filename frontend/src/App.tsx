@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { SceneCanvas } from './components/Scene/SceneCanvas'
 import { Toolbar } from './components/Toolbar/Toolbar'
 import { Sidebar } from './components/Sidebar/Sidebar'
-import { BottomBar } from './components/Controls/BottomBar'
+import { TimelinePanel } from './components/Controls/TimelinePanel'
 import { MapModal } from './components/MapPicker/MapModal'
 import { ProjectSidebar } from './components/ProjectSidebar/ProjectSidebar'
 import { usePlayback } from './hooks/usePlayback'
@@ -17,10 +17,12 @@ function App() {
       <Toolbar onOpenMap={() => setMapOpen(true)} />
       <div className="main-content">
         <ProjectSidebar />
-        <SceneCanvas />
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex' }}>
+          <SceneCanvas />
+          <TimelinePanel />
+        </div>
         <Sidebar />
       </div>
-      <BottomBar />
       <MapModal open={mapOpen} onClose={() => setMapOpen(false)} />
     </div>
   )

@@ -1,16 +1,20 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { useStore } from '../../store/useStore'
 import { BUILDING_PRESETS } from '../../utils/buildings'
 import { InputNumber, Slider, Button, ColorPicker } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
+import { BuildingIcon } from '../BuildingIcon'
 
-export function BuildingEditor() {
-  const selectedId = useStore(s => s.selectedBuildingId)
+interface Props {
+  editingId: string
+}
+
+export function BuildingEditor({ editingId }: Props) {
   const buildings = useStore(s => s.buildings)
   const updateBuilding = useStore(s => s.updateBuilding)
   const removeBuilding = useStore(s => s.removeBuilding)
 
-  const building = buildings.find(b => b.id === selectedId)
+  const building = buildings.find(b => b.id === editingId)
 
   const handleRotationChange = useCallback((v: number) => {
     if (building) updateBuilding(building.id, { rotation: v })
@@ -39,8 +43,8 @@ export function BuildingEditor() {
 
   return (
     <div style={{ padding: 12 }}>
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
-        {preset.icon} {building.name}
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <BuildingIcon name={preset.icon} /> {building.name}
       </div>
 
       {/* Parameters */}

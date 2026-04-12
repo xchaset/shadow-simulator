@@ -2,6 +2,7 @@ import { BUILDING_PRESETS, createBuilding } from '../../utils/buildings'
 import { useStore } from '../../store/useStore'
 import type { BuildingType } from '../../types'
 import { Button, Tooltip } from 'antd'
+import { BuildingIcon } from '../BuildingIcon'
 
 export function BuildingTools() {
   const addBuilding = useStore(s => s.addBuilding)
@@ -21,7 +22,7 @@ export function BuildingTools() {
             size="small"
             onClick={() => handleAdd(type)}
           >
-            {preset.icon}
+            <BuildingIcon name={preset.icon} />
           </Button>
         </Tooltip>
       ))}

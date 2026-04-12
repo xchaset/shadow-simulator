@@ -1,7 +1,15 @@
+import { Button } from 'antd'
+import { EditOutlined } from '@ant-design/icons'
 import { useStore } from '../../store/useStore'
 import { BUILDING_PRESETS } from '../../utils/buildings'
+import { BuildingIcon } from '../BuildingIcon'
 
-export function BuildingList() {
+interface Props {
+  editingId: string | null
+  onEdit: (id: string) => void
+}
+
+export function BuildingList({ editingId, onEdit }: Props) {
   const buildings = useStore(s => s.buildings)
   const selectedId = useStore(s => s.selectedBuildingId)
   const selectBuilding = useStore(s => s.selectBuilding)
@@ -17,7 +25,7 @@ export function BuildingList() {
           key={b.id}
           onClick={() => selectBuilding(b.id)}
           style={{
-            padding: '8px 12px',
+            padding: '6px 12px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -27,7 +35,22 @@ export function BuildingList() {
           }}
         >
           <div style={{ width: 12, height: 12, borderRadius: 2, background: b.color, flexShrink: 0 }} />
-          <span style={{ fontSize: 13 }}>{BUILDING_PRESETS[b.type]?.icon} {b.name}</span>
+          <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <BuildingIcon name={BUILDING_PRESETS[b.type]?.icon} /> {b.name}
+          </span>
+          <Button
+            type="text"
+            size="small"
+            icon={<EditOutlined />}
+            style={{
+              flexShrink: 0,
+              color: editingId === b.id ? '#1677ff' : '#bbb',
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(b.id)
+            }}
+          />
         </div>
       ))}
     </div>

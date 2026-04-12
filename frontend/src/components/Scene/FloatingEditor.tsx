@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore'
 import { BUILDING_PRESETS } from '../../utils/buildings'
 import { InputNumber, Slider, ColorPicker, Button } from 'antd'
 import { DeleteOutlined, CloseOutlined } from '@ant-design/icons'
+import { BuildingIcon } from '../BuildingIcon'
 
 export function FloatingEditor() {
   const selectedId = useStore(s => s.selectedBuildingId)
@@ -69,7 +70,7 @@ export function FloatingEditor() {
         borderBottom: '1px solid #eee',
       }}>
         <span style={{ fontWeight: 600, fontSize: 14 }}>
-          {preset.icon} {building.name}
+          <BuildingIcon name={preset.icon} /> {building.name}
         </span>
         <Button
           type="text"

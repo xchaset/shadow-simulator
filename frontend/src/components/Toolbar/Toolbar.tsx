@@ -2,7 +2,7 @@ import { BuildingTools } from './BuildingTools'
 import { CitySelector } from './CitySelector'
 import { SunInfoPanel } from '../SunInfo/SunInfoPanel'
 import { Button } from 'antd'
-import { EnvironmentOutlined } from '@ant-design/icons'
+import { AimOutlined, AppstoreOutlined } from '@ant-design/icons'
 
 interface ToolbarProps {
   onOpenMap?: () => void
@@ -21,13 +21,15 @@ export function Toolbar({ onOpenMap }: ToolbarProps) {
       zIndex: 10,
       flexShrink: 0,
     }}>
-      <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>🏗️ 阴影模拟器</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>
+        <AppstoreOutlined /> 阴影模拟器
+      </div>
       <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
       <CitySelector />
       {onOpenMap && (
         <Button
           size="small"
-          icon={<EnvironmentOutlined />}
+          icon={<AimOutlined />}
           onClick={onOpenMap}
         >
           选点

@@ -1,4 +1,5 @@
 import { Select } from 'antd'
+import { EnvironmentOutlined } from '@ant-design/icons'
 import { HOT_CITIES } from '../../utils/cities'
 import { useStore } from '../../store/useStore'
 
@@ -17,7 +18,8 @@ export function CitySelector() {
       }}
       style={{ width: 120 }}
       size="small"
-      options={HOT_CITIES.map(c => ({ value: c.name, label: `📍 ${c.name}` }))}
+      suffixIcon={<EnvironmentOutlined />}
+      options={HOT_CITIES.map(c => ({ value: c.name, label: c.name }))}
     />
   )
 }

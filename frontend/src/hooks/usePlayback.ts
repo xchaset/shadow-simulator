@@ -5,8 +5,16 @@ export function usePlayback() {
   const rafRef = useRef<number>()
   const lastTimeRef = useRef<number>(0)
   const playback = useStore(s => s.playback)
-  const dateTime = useStore(s => s.dateTime)
   const setDateTime = useStore(s => s.setDateTime)
+
+  // Use a ref to always read the latest dateTime without re-creating the loop
+  const dateTimeRef = useRef(useStore.getState().dateTime)
+  useEffect(() => {
+    const unsub = useStore.subscribe((state) => {
+      dateTimeRef.current = state.dateTime
+    })
+    return unsub
+  }, [])
 
   useEffect(() => {
     if (!playback.playing) {
@@ -22,7 +30,8 @@ export function usePlayback() {
 
       // Each real second = speed minutes of simulated time
       const simMinutes = (delta / 1000) * playback.speed
-      const newDate = new Date(dateTime.getTime() + simMinutes * 60000)
+      const newDate = new Date(dateTimeRef.current.getTime() + simMinutes * 60000)
+      dateTimeRef.current = newDate
       setDateTime(newDate)
 
       rafRef.current = requestAnimationFrame(animate)
@@ -32,7 +41,5 @@ export function usePlayback() {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [playback.playing, playback.speed])
-  // Note: dateTime and setDateTime intentionally excluded from deps
-  // to avoid re-creating the animation loop on every frame
+  }, [playback.playing, playback.speed, setDateTime])
 }

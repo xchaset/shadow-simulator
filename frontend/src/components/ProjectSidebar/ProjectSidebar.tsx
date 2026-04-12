@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Button, Input, Tree, Dropdown, Modal, message, Tooltip, Empty, Spin,
 } from 'antd'
+import type { InputRef } from 'antd'
 import {
   FolderOutlined, FolderOpenOutlined, FileOutlined,
   PlusOutlined, SaveOutlined, DeleteOutlined, EditOutlined,
@@ -28,7 +29,8 @@ export function ProjectSidebar() {
 
   // Rename state
   const [renaming, setRenaming] = useState<{ type: 'dir' | 'model'; id: string } | null>(null)
-  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<InputRef>(null)
+  const composingRef = useRef(false)
 
   // ─── Data fetching ──────────────────────────────────────
 
@@ -80,7 +82,6 @@ export function ProjectSidebar() {
       setModels(prev => ({ ...prev, [dir.id]: [] }))
       setExpandedKeys(prev => [...prev, `dir-${dir.id}`])
       setRenaming({ type: 'dir', id: dir.id })
-      setRenameValue(dir.name)
     } catch (err: any) {
       message.error('创建目录失败: ' + err.message)
     }
@@ -114,15 +115,17 @@ export function ProjectSidebar() {
   }
 
   const handleRenameConfirm = async () => {
-    if (!renaming || !renameValue.trim()) {
+    if (!renaming) return
+    const value = renameInputRef.current?.input?.value?.trim()
+    if (!value) {
       setRenaming(null)
       return
     }
     try {
       if (renaming.type === 'dir') {
-        await directoryApi.update(renaming.id, { name: renameValue.trim() })
+        await directoryApi.update(renaming.id, { name: value })
       } else {
-        await modelApi.update(renaming.id, { name: renameValue.trim() })
+        await modelApi.update(renaming.id, { name: value })
       }
       await fetchDirectories()
     } catch (err: any) {
@@ -144,7 +147,6 @@ export function ProjectSidebar() {
         prev.includes(`dir-${dirId}`) ? prev : [...prev, `dir-${dirId}`]
       )
       setRenaming({ type: 'model', id: model.id })
-      setRenameValue(model.name)
     } catch (err: any) {
       message.error('创建模型失败: ' + err.message)
     }
@@ -251,11 +253,14 @@ export function ProjectSidebar() {
     key: `dir-${dir.id}`,
     title: renaming?.type === 'dir' && renaming.id === dir.id ? (
       <Input
+        ref={renameInputRef}
         size="small"
-        value={renameValue}
-        onChange={e => setRenameValue(e.target.value)}
+        defaultValue={dir.name}
         onBlur={handleRenameConfirm}
-        onPressEnter={handleRenameConfirm}
+        onPressEnter={() => { if (!composingRef.current) handleRenameConfirm() }}
+        onCompositionStart={() => { composingRef.current = true }}
+        onCompositionEnd={() => { composingRef.current = false }}
+        onKeyDown={e => e.stopPropagation()}
         autoFocus
         style={{ width: 130 }}
         onClick={e => e.stopPropagation()}
@@ -267,7 +272,7 @@ export function ProjectSidebar() {
             { key: 'new-model', icon: <PlusOutlined />, label: '新建模型',
               onClick: () => handleCreateModel(dir.id) },
             { key: 'rename', icon: <EditOutlined />, label: '重命名',
-              onClick: () => { setRenaming({ type: 'dir', id: dir.id }); setRenameValue(dir.name) } },
+              onClick: () => { setRenaming({ type: 'dir', id: dir.id }) } },
             { type: 'divider' },
             { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
               onClick: () => handleDeleteDirectory(dir) },
@@ -293,11 +298,14 @@ export function ProjectSidebar() {
       key: `model-${model.id}`,
       title: renaming?.type === 'model' && renaming.id === model.id ? (
         <Input
+          ref={renameInputRef}
           size="small"
-          value={renameValue}
-          onChange={e => setRenameValue(e.target.value)}
+          defaultValue={model.name}
           onBlur={handleRenameConfirm}
-          onPressEnter={handleRenameConfirm}
+          onPressEnter={() => { if (!composingRef.current) handleRenameConfirm() }}
+          onCompositionStart={() => { composingRef.current = true }}
+          onCompositionEnd={() => { composingRef.current = false }}
+          onKeyDown={e => e.stopPropagation()}
           autoFocus
           style={{ width: 130 }}
           onClick={e => e.stopPropagation()}
@@ -307,7 +315,7 @@ export function ProjectSidebar() {
           menu={{
             items: [
               { key: 'rename', icon: <EditOutlined />, label: '重命名',
-                onClick: () => { setRenaming({ type: 'model', id: model.id }); setRenameValue(model.name) } },
+                onClick: () => { setRenaming({ type: 'model', id: model.id }) } },
               { type: 'divider' },
               { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
                 onClick: () => handleDeleteModel(model) },
@@ -373,7 +381,9 @@ export function ProjectSidebar() {
         borderBottom: '1px solid #e8e8e8',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
-        <span>📁 项目</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <FolderOutlined /> 项目
+        </span>
         <div style={{ display: 'flex', gap: 2 }}>
           {dirty && currentModelId && (
             <Tooltip title="保存 (Ctrl+S)">
