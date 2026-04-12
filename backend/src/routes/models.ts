@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import db from '../db.js'
+import { validate } from '../middleware/validator.js'
+import * as schema from '../schemas/models.js'
 
 const router = Router()
 
@@ -28,7 +30,7 @@ function parseRow(row: any) {
 }
 
 // ─── GET /api/directories/:dirId/models ───────────────────
-router.get('/directories/:dirId/models', (req, res) => {
+router.get('/directories/:dirId/models', validate(schema.listModels), (req, res) => {
   const { dirId } = req.params
   const rows = db.prepare(`
     SELECT id, directory_id, name, description, location_lat, location_lng,
@@ -41,26 +43,16 @@ router.get('/directories/:dirId/models', (req, res) => {
 })
 
 // ─── POST /api/directories/:dirId/models ──────────────────
-router.post('/directories/:dirId/models', (req, res) => {
+router.post('/directories/:dirId/models', validate(schema.createModel), (req, res) => {
   const { dirId } = req.params
 
   const dir = db.prepare('SELECT id FROM directories WHERE id = ?').get(dirId)
   if (!dir) { res.status(404).json({ error: '目录不存在' }); return }
 
   const {
-    name,
-    description = '',
-    location_lat = 39.9042,
-    location_lng = 116.4074,
-    city_name = '北京',
-    date_time,
-    scene_data,
-    sort_order = 0,
+    name, description, location_lat, location_lng,
+    city_name, date_time, scene_data, sort_order,
   } = req.body
-
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    res.status(400).json({ error: '模型名称不能为空' }); return
-  }
 
   const { str: sceneStr, count: buildingCount } = normalizeSceneData(scene_data)
   const id = uuidv4()
@@ -70,7 +62,7 @@ router.post('/directories/:dirId/models', (req, res) => {
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
                         city_name, date_time, building_count, scene_data, sort_order)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, dirId, name.trim(), description, location_lat, location_lng,
+  `).run(id, dirId, name, description, location_lat, location_lng,
          city_name, dt, buildingCount, sceneStr, sort_order)
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
@@ -78,7 +70,7 @@ router.post('/directories/:dirId/models', (req, res) => {
 })
 
 // ─── GET /api/models/:id ──────────────────────────────────
-router.get('/models/:id', (req, res) => {
+router.get('/models/:id', validate(schema.getModel), (req, res) => {
   const { id } = req.params
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
   if (!row) { res.status(404).json({ error: '模型不存在' }); return }
@@ -86,7 +78,7 @@ router.get('/models/:id', (req, res) => {
 })
 
 // ─── PUT /api/models/:id ──────────────────────────────────
-router.put('/models/:id', (req, res) => {
+router.put('/models/:id', validate(schema.updateModel), (req, res) => {
   const { id } = req.params
   const existing = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
   if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
@@ -97,12 +89,7 @@ router.put('/models/:id', (req, res) => {
   const updates: string[] = []
   const values: any[] = []
 
-  if (name !== undefined) {
-    if (typeof name !== 'string' || !name.trim()) {
-      res.status(400).json({ error: '模型名称不能为空' }); return
-    }
-    updates.push('name = ?'); values.push(name.trim())
-  }
+  if (name !== undefined) { updates.push('name = ?'); values.push(name) }
   if (description !== undefined) { updates.push('description = ?'); values.push(description) }
   if (location_lat !== undefined) { updates.push('location_lat = ?'); values.push(location_lat) }
   if (location_lng !== undefined) { updates.push('location_lng = ?'); values.push(location_lng) }
@@ -129,7 +116,7 @@ router.put('/models/:id', (req, res) => {
 })
 
 // ─── DELETE /api/models/:id ───────────────────────────────
-router.delete('/models/:id', (req, res) => {
+router.delete('/models/:id', validate(schema.deleteModel), (req, res) => {
   const { id } = req.params
   const existing = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
   if (!existing) { res.status(404).json({ error: '模型不存在' }); return }

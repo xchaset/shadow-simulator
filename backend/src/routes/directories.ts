@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import db from '../db.js'
+import { validate } from '../middleware/validator.js'
+import * as schema from '../schemas/directories.js'
 
 const router = Router()
 
@@ -17,24 +19,20 @@ router.get('/', (_req, res) => {
 })
 
 // POST /api/directories — create
-router.post('/', (req, res) => {
-  const { name, description = '', sort_order = 0 } = req.body
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    res.status(400).json({ error: '目录名称不能为空' })
-    return
-  }
+router.post('/', validate(schema.createDirectory), (req, res) => {
+  const { name, description, sort_order } = req.body
   const id = uuidv4()
   db.prepare(`
     INSERT INTO directories (id, name, description, sort_order)
     VALUES (?, ?, ?, ?)
-  `).run(id, name.trim(), description, sort_order)
+  `).run(id, name, description, sort_order)
 
   const row = db.prepare('SELECT * FROM directories WHERE id = ?').get(id)
   res.status(201).json(row)
 })
 
 // PUT /api/directories/:id — update
-router.put('/:id', (req, res) => {
+router.put('/:id', validate(schema.updateDirectory), (req, res) => {
   const { id } = req.params
   const existing = db.prepare('SELECT * FROM directories WHERE id = ?').get(id)
   if (!existing) {
@@ -46,22 +44,9 @@ router.put('/:id', (req, res) => {
   const updates: string[] = []
   const values: any[] = []
 
-  if (name !== undefined) {
-    if (typeof name !== 'string' || !name.trim()) {
-      res.status(400).json({ error: '目录名称不能为空' })
-      return
-    }
-    updates.push('name = ?')
-    values.push(name.trim())
-  }
-  if (description !== undefined) {
-    updates.push('description = ?')
-    values.push(description)
-  }
-  if (sort_order !== undefined) {
-    updates.push('sort_order = ?')
-    values.push(sort_order)
-  }
+  if (name !== undefined) { updates.push('name = ?'); values.push(name) }
+  if (description !== undefined) { updates.push('description = ?'); values.push(description) }
+  if (sort_order !== undefined) { updates.push('sort_order = ?'); values.push(sort_order) }
 
   if (updates.length === 0) {
     res.status(400).json({ error: '没有需要更新的字段' })
@@ -77,7 +62,7 @@ router.put('/:id', (req, res) => {
 })
 
 // DELETE /api/directories/:id — delete (cascade models)
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validate(schema.deleteDirectory), (req, res) => {
   const { id } = req.params
   const existing = db.prepare('SELECT * FROM directories WHERE id = ?').get(id)
   if (!existing) {
