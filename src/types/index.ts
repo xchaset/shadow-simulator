@@ -42,12 +42,44 @@ export interface PlaybackState {
   speed: number
 }
 
+// ─── Project Types ────────────────────────────────────────
+
+export interface Directory {
+  id: string
+  name: string
+  description: string
+  sort_order: number
+  model_count?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Model {
+  id: string
+  directory_id: string
+  name: string
+  description: string
+  location_lat: number
+  location_lng: number
+  city_name: string
+  date_time: string
+  building_count: number
+  scene_data?: Building[]
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+// ─── App State ────────────────────────────────────────────
+
 export interface AppState {
+  // Scene
   location: Location
   setLocation: (loc: Location) => void
   dateTime: Date
   setDateTime: (dt: Date) => void
   buildings: Building[]
+  setBuildings: (buildings: Building[]) => void
   addBuilding: (b: Building) => void
   updateBuilding: (id: string, updates: Partial<Building>) => void
   removeBuilding: (id: string) => void
@@ -59,4 +91,16 @@ export interface AppState {
   setDragging: (v: boolean) => void
   playback: PlaybackState
   setPlayback: (p: Partial<PlaybackState>) => void
+
+  // Project
+  directories: Directory[]
+  setDirectories: (dirs: Directory[]) => void
+  models: Model[]
+  setModels: (models: Model[] | ((prev: Model[]) => Model[])) => void
+  currentDirectoryId: string | null
+  setCurrentDirectoryId: (id: string | null) => void
+  currentModelId: string | null
+  setCurrentModelId: (id: string | null) => void
+  dirty: boolean
+  setDirty: (v: boolean) => void
 }

@@ -4,6 +4,7 @@ import { Toolbar } from './components/Toolbar/Toolbar'
 import { Sidebar } from './components/Sidebar/Sidebar'
 import { BottomBar } from './components/Controls/BottomBar'
 import { MapModal } from './components/MapPicker/MapModal'
+import { ProjectSidebar } from './components/ProjectSidebar/ProjectSidebar'
 import { usePlayback } from './hooks/usePlayback'
 import './App.css'
 
@@ -15,6 +16,7 @@ function App() {
     <div className="app">
       <Toolbar onOpenMap={() => setMapOpen(true)} />
       <div className="main-content">
+        <ProjectSidebar />
         <SceneCanvas />
         <Sidebar />
       </div>
