@@ -184,7 +184,13 @@ export function ProjectSidebar() {
 
   const handleCreateModel = async (dirId: string) => {
     try {
-      const model = await modelApi.create(dirId, { name: '新建模型' })
+      const model = await modelApi.create(dirId, {
+        name: '新建模型',
+        location_lat: location.lat,
+        location_lng: location.lng,
+        city_name: location.cityName,
+        date_time: dateTime.toISOString(),
+      })
       setModels(prev => ({
         ...prev,
         [dirId]: [...(prev[dirId] || []), model],

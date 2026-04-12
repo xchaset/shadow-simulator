@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useStore } from '../store/useStore'
-import { getSunData, sunToLightPosition } from '../utils/sunCalc'
+import { getSunData, sunToLightPosition, calculateShadowCameraBounds } from '../utils/sunCalc'
 
 export function useSunPosition() {
   const location = useStore(s => s.location)
@@ -16,6 +16,11 @@ export function useSunPosition() {
     [sunData.azimuth, sunData.altitude],
   )
 
+  const shadowBounds = useMemo(
+    () => calculateShadowCameraBounds(sunData.altitude),
+    [sunData.altitude],
+  )
+
   const ambientIntensity = useMemo(() => {
     if (sunData.isNight) return 0.1
     return Math.max(0.15, Math.min(0.6, sunData.altitude / (Math.PI / 2) * 0.6))
@@ -29,6 +34,7 @@ export function useSunPosition() {
   return {
     ...sunData,
     lightPosition,
+    shadowBounds,
     ambientIntensity,
     directionalIntensity,
   }
