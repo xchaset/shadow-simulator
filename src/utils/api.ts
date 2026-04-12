@@ -1,3 +1,5 @@
+import type { Building } from '../types'
+
 const API_BASE = '/api'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -12,7 +14,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-// ─── Directory API ───────────────────────────────────────────
+// ─── Directory API ────────────────────────────────────────
 
 export interface DirectoryDTO {
   id: string
@@ -43,7 +45,7 @@ export const directoryApi = {
     request<{ success: boolean }>(`/directories/${id}`, { method: 'DELETE' }),
 }
 
-// ─── Model API ───────────────────────────────────────────────
+// ─── Model API ────────────────────────────────────────────
 
 export interface ModelDTO {
   id: string
@@ -55,10 +57,31 @@ export interface ModelDTO {
   city_name: string
   date_time: string
   building_count: number
-  scene_data?: string   // JSON string of Building[]
+  scene_data?: Building[]
   sort_order: number
   created_at: string
   updated_at: string
+}
+
+export interface CreateModelParams {
+  name: string
+  description?: string
+  location_lat?: number
+  location_lng?: number
+  city_name?: string
+  date_time?: string
+  scene_data?: Building[]
+}
+
+export interface UpdateModelParams {
+  name?: string
+  description?: string
+  location_lat?: number
+  location_lng?: number
+  city_name?: string
+  date_time?: string
+  scene_data?: Building[]
+  sort_order?: number
 }
 
 export const modelApi = {
@@ -68,24 +91,16 @@ export const modelApi = {
   get: (id: string) =>
     request<ModelDTO>(`/models/${id}`),
 
-  create: (dirId: string, data: {
-    name: string
-    description?: string
-    location_lat?: number
-    location_lng?: number
-    city_name?: string
-    date_time?: string
-    scene_data?: string
-  }) =>
+  create: (dirId: string, params: CreateModelParams) =>
     request<ModelDTO>(`/directories/${dirId}/models`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(params),
     }),
 
-  update: (id: string, data: Partial<Omit<ModelDTO, 'id' | 'created_at' | 'updated_at'>>) =>
+  update: (id: string, params: UpdateModelParams) =>
     request<ModelDTO>(`/models/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify(params),
     }),
 
   delete: (id: string) =>

@@ -5,7 +5,7 @@ import {
 import {
   FolderOutlined, FolderOpenOutlined, FileOutlined,
   PlusOutlined, SaveOutlined, DeleteOutlined, EditOutlined,
-  MoreOutlined, FolderAddOutlined, ExclamationCircleOutlined,
+  ExclamationCircleOutlined, FolderAddOutlined,
 } from '@ant-design/icons'
 import type { TreeDataNode } from 'antd'
 import { useStore } from '../../store/useStore'
@@ -16,8 +16,9 @@ export function ProjectSidebar() {
   const {
     currentModelId, currentDirectoryId, dirty,
     buildings, location, dateTime,
-    loadSceneFromModel, setDirty, setDirectories,
-    directories,
+    setBuildings, setLocation, setDateTime,
+    setCurrentModelId, setCurrentDirectoryId,
+    setDirty, setDirectories, directories,
   } = useStore()
 
   const [models, setModels] = useState<Record<string, Model[]>>({})
@@ -35,7 +36,6 @@ export function ProjectSidebar() {
     try {
       const dirs = await directoryApi.list()
       setDirectories(dirs)
-      // Fetch models for each directory
       const modelMap: Record<string, Model[]> = {}
       await Promise.all(
         dirs.map(async (d) => {
@@ -54,6 +54,23 @@ export function ProjectSidebar() {
     fetchDirectories()
   }, [fetchDirectories])
 
+  // ─── Load scene from model ─────────────────────────────
+
+  const loadSceneFromModel = useCallback((model: Model) => {
+    setBuildings(model.scene_data || [])
+    setLocation({
+      lat: model.location_lat,
+      lng: model.location_lng,
+      cityName: model.city_name,
+    })
+    if (model.date_time) {
+      setDateTime(new Date(model.date_time))
+    }
+    setCurrentModelId(model.id)
+    setCurrentDirectoryId(model.directory_id)
+    setDirty(false)
+  }, [setBuildings, setLocation, setDateTime, setCurrentModelId, setCurrentDirectoryId, setDirty])
+
   // ─── Directory operations ───────────────────────────────
 
   const handleCreateDirectory = async () => {
@@ -62,7 +79,6 @@ export function ProjectSidebar() {
       setDirectories([...directories, dir])
       setModels(prev => ({ ...prev, [dir.id]: [] }))
       setExpandedKeys(prev => [...prev, `dir-${dir.id}`])
-      // Auto rename
       setRenaming({ type: 'dir', id: dir.id })
       setRenameValue(dir.name)
     } catch (err: any) {
@@ -82,6 +98,12 @@ export function ProjectSidebar() {
       onOk: async () => {
         try {
           await directoryApi.delete(dir.id)
+          if (currentDirectoryId === dir.id) {
+            setCurrentDirectoryId(null)
+            setCurrentModelId(null)
+            setBuildings([])
+            setDirty(false)
+          }
           await fetchDirectories()
           message.success('已删除')
         } catch (err: any) {
@@ -121,7 +143,6 @@ export function ProjectSidebar() {
       setExpandedKeys(prev =>
         prev.includes(`dir-${dirId}`) ? prev : [...prev, `dir-${dirId}`]
       )
-      // Auto rename
       setRenaming({ type: 'model', id: model.id })
       setRenameValue(model.name)
     } catch (err: any) {
@@ -140,15 +161,13 @@ export function ProjectSidebar() {
       onOk: async () => {
         try {
           await modelApi.delete(model.id)
-          await fetchDirectories()
           if (currentModelId === model.id) {
-            useStore.setState({
-              currentModelId: null,
-              currentDirectoryId: null,
-              buildings: [],
-              dirty: false,
-            })
+            setCurrentModelId(null)
+            setCurrentDirectoryId(null)
+            setBuildings([])
+            setDirty(false)
           }
+          await fetchDirectories()
           message.success('已删除')
         } catch (err: any) {
           message.error('删除失败: ' + err.message)
@@ -160,16 +179,23 @@ export function ProjectSidebar() {
   const handleSelectModel = async (modelId: string) => {
     if (modelId === currentModelId) return
 
-    // Prompt save if dirty
     if (dirty && currentModelId) {
       Modal.confirm({
         title: '保存更改',
         content: '当前模型有未保存的更改，是否保存？',
         okText: '保存',
         cancelText: '不保存',
-        onOk: () => handleSave(),
-        onCancel: () => { /* discard */ },
+        onOk: async () => {
+          await handleSave()
+          const model = await modelApi.get(modelId)
+          loadSceneFromModel(model)
+        },
+        onCancel: async () => {
+          const model = await modelApi.get(modelId)
+          loadSceneFromModel(model)
+        },
       })
+      return
     }
 
     try {
@@ -189,7 +215,7 @@ export function ProjectSidebar() {
     }
     try {
       await modelApi.update(currentModelId, {
-        scene_data: JSON.stringify(buildings),
+        scene_data: buildings,
         location_lat: location.lat,
         location_lng: location.lng,
         city_name: location.cityName,
@@ -203,7 +229,7 @@ export function ProjectSidebar() {
     }
   }
 
-  // ─── Keyboard shortcut: Ctrl+S ──────────────────────────
+  // ─── Ctrl+S shortcut ───────────────────────────────────
 
   const handleSaveRef = useRef(handleSave)
   handleSaveRef.current = handleSave
@@ -231,7 +257,7 @@ export function ProjectSidebar() {
         onBlur={handleRenameConfirm}
         onPressEnter={handleRenameConfirm}
         autoFocus
-        style={{ width: 120 }}
+        style={{ width: 130 }}
         onClick={e => e.stopPropagation()}
       />
     ) : (
@@ -257,7 +283,7 @@ export function ProjectSidebar() {
             {dir.name}
           </span>
           <span style={{ color: '#999', fontSize: 11, flexShrink: 0 }}>
-            {dir.model_count || models[dir.id]?.length || 0}
+            {models[dir.id]?.length || 0}
           </span>
         </span>
       </Dropdown>
@@ -273,7 +299,7 @@ export function ProjectSidebar() {
           onBlur={handleRenameConfirm}
           onPressEnter={handleRenameConfirm}
           autoFocus
-          style={{ width: 120 }}
+          style={{ width: 130 }}
           onClick={e => e.stopPropagation()}
         />
       ) : (
@@ -311,7 +337,7 @@ export function ProjectSidebar() {
     })),
   }))
 
-  // ─── Collapsed state ───────────────────────────────────
+  // ─── Collapsed view ────────────────────────────────────
 
   if (collapsed) {
     return (
@@ -333,13 +359,13 @@ export function ProjectSidebar() {
     )
   }
 
-  // ─── Main render ────────────────────────────────────────
+  // ─── Full render ────────────────────────────────────────
 
   return (
     <div style={{
       width: 240, background: '#fafafa', borderRight: '1px solid #e8e8e8',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      userSelect: 'none',
+      userSelect: 'none', flexShrink: 0,
     }}>
       {/* Header */}
       <div style={{
@@ -370,9 +396,7 @@ export function ProjectSidebar() {
       {/* Tree */}
       <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <Spin size="small" />
-          </div>
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin size="small" /></div>
         ) : directories.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
