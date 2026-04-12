@@ -1,4 +1,5 @@
 import { BuildingTools } from './BuildingTools'
+import { BuildingImporter } from './BuildingImporter'
 import { CitySelector } from './CitySelector'
 import { SunInfoPanel } from '../SunInfo/SunInfoPanel'
 import { Button } from 'antd'
@@ -37,6 +38,7 @@ export function Toolbar({ onOpenMap }: ToolbarProps) {
       )}
       <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
       <BuildingTools />
+      <BuildingImporter />
       <div style={{ flex: 1 }} />
       <SunInfoPanel />
     </div>
