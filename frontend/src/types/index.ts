@@ -12,6 +12,8 @@ export type BuildingType =
   | 'road'
   | 'green-belt'
   | 'tree'
+  | 'ai-circular'
+  | 'ai-complex'
 
 export interface Building {
   id: string
@@ -91,6 +93,10 @@ export interface AppState {
   setDragging: (v: boolean) => void
   playback: PlaybackState
   setPlayback: (p: Partial<PlaybackState>) => void
+  showGrid: boolean
+  setShowGrid: (v: boolean) => void
+  showGrid: boolean
+  setShowGrid: (v: boolean) => void
 
   // Project
   directories: Directory[]

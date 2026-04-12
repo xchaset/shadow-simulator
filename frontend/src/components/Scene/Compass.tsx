@@ -4,15 +4,15 @@ import * as THREE from 'three'
 /**
  * 在地面边缘标注东西南北方位
  *
- * 坐标系映射（SunCalc 约定）:
+ * 坐标系（地理惯例，北上东右）:
  *   +Z = 南 (S)
  *   -Z = 北 (N)
- *   +X = 西 (W)
- *   -X = 东 (E)
+ *   +X = 东 (E)
+ *   -X = 西 (W)
  */
 
-const GROUND_HALF = 100 // 地面 200×200 的一半
-const LABEL_OFFSET = GROUND_HALF + 6 // 标注放在地面边缘外侧
+const GROUND_HALF = 250 // 地面 500×500 的一半
+const LABEL_OFFSET = GROUND_HALF + 6
 const FONT_SIZE = 6
 const FONT_COLOR = '#666666'
 const ACCENT_COLOR = '#dc2626' // 北（红色突出）
@@ -71,8 +71,8 @@ export function Compass() {
       {/* 方位文字 */}
       <CompassLabel text="N 北" position={[0, 0.1, -LABEL_OFFSET]} color={ACCENT_COLOR} />
       <CompassLabel text="S 南" position={[0, 0.1, LABEL_OFFSET]} />
-      <CompassLabel text="E 东" position={[-LABEL_OFFSET, 0.1, 0]} />
-      <CompassLabel text="W 西" position={[LABEL_OFFSET, 0.1, 0]} />
+      <CompassLabel text="E 东" position={[LABEL_OFFSET, 0.1, 0]} />
+      <CompassLabel text="W 西" position={[-LABEL_OFFSET, 0.1, 0]} />
 
       {/* 十字方位线 */}
       <CompassLines />

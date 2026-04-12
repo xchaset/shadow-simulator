@@ -3,21 +3,45 @@ import { createBuilding } from './buildings'
 
 // ─── Types ────────────────────────────────────────────────
 
+export interface LevelParams {
+  height: number
+  width?: number
+  depth?: number
+  radius?: number
+  roofType: 'flat' | 'gable' | 'hip' | 'chinese-eave' | 'dome'
+  roofOverhang?: number
+}
+
 export interface BuildingAnalysisParams {
-  floors: number
-  width: number
-  depth: number
-  floorHeight: number
-  roofType: 'flat' | 'gable' | 'hip'
-  windowLayout: {
+  shape: 'rectangular' | 'circular' | 'complex'
+
+  // 简单矩形
+  floors?: number
+  width?: number
+  depth?: number
+  floorHeight?: number
+  roofType?: 'flat' | 'gable' | 'hip' | 'chinese-eave' | 'dome'
+
+  // 圆形
+  radius?: number
+  segments?: number
+
+  // 多层
+  levels?: LevelParams[]
+
+  // 窗户
+  windowLayout?: {
     rows: number
     cols: number
     width: number
     height: number
   }
+
+  // 材质
   material: {
     wallColor: string
     roofColor: string
+    roofTexture?: 'tile' | 'metal' | 'concrete'
   }
 }
 
@@ -49,6 +73,16 @@ export async function analyzeBuilding(imageBase64: string): Promise<AnalysisResu
   return res.json()
 }
 
+// ─── roofType → 数字编码 ─────────────────────────────────
+
+const ROOF_CODE: Record<string, number> = {
+  flat: 0,
+  'chinese-eave': 1,
+  dome: 2,
+  gable: 3,
+  hip: 4,
+}
+
 // ─── Conversion ───────────────────────────────────────────
 
 /**
@@ -59,63 +93,85 @@ export function analysisToBuildings(
   position: [number, number] = [0, 0],
 ): Building[] {
   const buildings: Building[] = []
-  const totalHeight = params.floors * params.floorHeight
 
-  // 根据屋顶类型选择建筑类型
-  if (params.roofType === 'gable') {
-    // 坡屋顶建筑
-    const b = createBuilding('gable-roof', position)
-    b.name = `AI 建筑 (坡屋顶 ${params.floors}F)`
-    b.params = {
-      width: params.width,
-      depth: params.depth,
-      wallHeight: totalHeight,
-      ridgeHeight: Math.max(2, params.width * 0.2),
+  if (params.shape === 'circular' && params.levels?.length) {
+    // ── 圆形多层建筑 ──
+    const b = createBuilding('ai-circular', position)
+    b.name = `AI 建筑 (圆形 ${params.levels.length}层)`
+    const p: Record<string, number> = {
+      segments: params.segments || 48,
+      levelCount: params.levels.length,
     }
+    params.levels.forEach((lv, i) => {
+      p[`level_${i}_height`] = lv.height
+      p[`level_${i}_radius`] = lv.radius || params.radius || 10
+      p[`level_${i}_roofType`] = ROOF_CODE[lv.roofType] ?? 0
+      p[`level_${i}_overhang`] = lv.roofOverhang || 0
+    })
+    // 存 roofColor 供 BuildingMesh 使用
+    ;(p as any).roofColor = params.material.roofColor
+    b.params = p
     b.color = params.material.wallColor
     buildings.push(b)
-  } else if (params.floors > 10) {
-    // 高层建筑 → 裙楼+塔楼
-    const podiumFloors = Math.min(3, Math.floor(params.floors * 0.15))
-    const podiumHeight = podiumFloors * params.floorHeight
-    const towerHeight = totalHeight - podiumHeight
-
-    const b = createBuilding('podium-tower', position)
-    b.name = `AI 建筑 (高层 ${params.floors}F)`
-    b.params = {
-      podiumWidth: params.width,
-      podiumDepth: params.depth,
-      podiumHeight,
-      towerWidth: params.width * 0.6,
-      towerDepth: params.depth * 0.6,
-      towerHeight,
+  } else if (params.shape === 'complex' && params.levels?.length) {
+    // ── 矩形多层收分建筑 ──
+    const b = createBuilding('ai-complex', position)
+    b.name = `AI 建筑 (复杂 ${params.levels.length}层)`
+    const p: Record<string, number> = {
+      levelCount: params.levels.length,
     }
-    b.color = params.material.wallColor
-    buildings.push(b)
-  } else if (params.floors > 5) {
-    // 多层建筑 → 阶梯退台
-    const b = createBuilding('stepped', position)
-    b.name = `AI 建筑 (多层 ${params.floors}F)`
-    b.params = {
-      baseWidth: params.width,
-      baseDepth: params.depth,
-      levels: Math.min(params.floors, 4),
-      stepback: 2,
-      levelHeight: totalHeight / Math.min(params.floors, 4),
-    }
+    params.levels.forEach((lv, i) => {
+      p[`level_${i}_height`] = lv.height
+      p[`level_${i}_width`] = lv.width || params.width || 20
+      p[`level_${i}_depth`] = lv.depth || params.depth || 20
+      p[`level_${i}_roofType`] = ROOF_CODE[lv.roofType] ?? 0
+      p[`level_${i}_overhang`] = lv.roofOverhang || 0
+    })
+    ;(p as any).roofColor = params.material.roofColor
+    b.params = p
     b.color = params.material.wallColor
     buildings.push(b)
   } else {
-    // 低层建筑 → 长方体
-    const b = createBuilding('box', position)
-    b.name = `AI 建筑 (${params.floors}F)`
-    b.params = {
-      width: params.width,
-      depth: params.depth,
-      height: totalHeight,
+    // ── 简单矩形建筑（兼容旧逻辑）──
+    const totalHeight = (params.floors || 5) * (params.floorHeight || 3)
+    const w = params.width || 20
+    const d = params.depth || 15
+    const roofType = params.roofType || 'flat'
+
+    if (roofType === 'gable') {
+      const b = createBuilding('gable-roof', position)
+      b.name = `AI 建筑 (坡屋顶 ${params.floors}F)`
+      b.params = {
+        width: w,
+        depth: d,
+        wallHeight: totalHeight,
+        ridgeHeight: Math.max(2, w * 0.2),
+      }
+      b.color = params.material.wallColor
+      buildings.push(b)
+    } else if ((params.floors || 5) > 10) {
+      const podiumFloors = Math.min(3, Math.floor((params.floors || 5) * 0.15))
+      const podiumHeight = podiumFloors * (params.floorHeight || 3)
+      const towerHeight = totalHeight - podiumHeight
+      const b = createBuilding('podium-tower', position)
+      b.name = `AI 建筑 (高层 ${params.floors}F)`
+      b.params = {
+        podiumWidth: w,
+        podiumDepth: d,
+        podiumHeight,
+        towerWidth: w * 0.6,
+        towerDepth: d * 0.6,
+        towerHeight,
+      }
+      b.color = params.material.wallColor
+      buildings.push(b)
+    } else {
+      const b = createBuilding('box', position)
+      b.name = `AI 建筑 (${params.floors || 5}F)`
+      b.params = { width: w, depth: d, height: totalHeight }
+      b.color = params.material.wallColor
+      buildings.push(b)
     }
-    b.color = params.material.wallColor
-    buildings.push(b)
   }
 
   return buildings

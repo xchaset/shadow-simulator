@@ -1,5 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { Button, Tooltip } from 'antd'
+import { BorderOutlined, BorderlessTableOutlined } from '@ant-design/icons'
 import { Ground } from './Ground'
 import { SunLight } from './SunLight'
 import { SunIndicator } from './SunIndicator'
@@ -33,6 +35,8 @@ interface ClipboardBuilding {
 
 export function SceneCanvas() {
   const selectBuilding = useStore(s => s.selectBuilding)
+  const showGrid = useStore(s => s.showGrid)
+  const setShowGrid = useStore(s => s.setShowGrid)
   const containerRef = useRef<HTMLDivElement>(null)
   const clipboardRef = useRef<ClipboardBuilding | null>(null)
 
@@ -115,6 +119,25 @@ export function SceneCanvas() {
   return (
     <div ref={containerRef} style={{ flex: 1, position: 'relative' }} tabIndex={-1}>
       <FloatingEditor />
+      {/* 网格显示/隐藏 */}
+      <Tooltip title={showGrid ? '隐藏网格' : '显示网格'} placement="left">
+        <Button
+          type="text"
+          size="small"
+          icon={showGrid ? <BorderlessTableOutlined /> : <BorderOutlined />}
+          onClick={() => setShowGrid(!showGrid)}
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 12,
+            zIndex: 10,
+            background: 'rgba(255,255,255,0.75)',
+            backdropFilter: 'blur(4px)',
+            borderRadius: 6,
+            color: showGrid ? '#1677ff' : '#999',
+          }}
+        />
+      </Tooltip>
       <Canvas
         shadows
         camera={{ position: [0, 100, -130], fov: 50 }}

@@ -115,6 +115,50 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
   res.json(parseRow(row))
 })
 
+// ─── POST /api/models/:id/copy ────────────────────────────
+router.post('/models/:id/copy', validate(schema.getModel), (req, res) => {
+  const { id } = req.params
+  const existing: any = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
+  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+
+  const targetDirId = req.body?.target_directory_id || existing.directory_id
+  const targetDir = db.prepare('SELECT id FROM directories WHERE id = ?').get(targetDirId)
+  if (!targetDir) { res.status(404).json({ error: '目标目录不存在' }); return }
+
+  const newId = uuidv4()
+  const newName = existing.name + ' 副本'
+
+  db.prepare(`
+    INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
+                        city_name, date_time, building_count, scene_data, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(newId, targetDirId, newName, existing.description, existing.location_lat,
+         existing.location_lng, existing.city_name, existing.date_time,
+         existing.building_count, existing.scene_data, existing.sort_order)
+
+  const row = db.prepare('SELECT * FROM models WHERE id = ?').get(newId)
+  res.status(201).json(parseRow(row))
+})
+
+// ─── PUT /api/models/:id/move ─────────────────────────────
+router.put('/models/:id/move', validate(schema.getModel), (req, res) => {
+  const { id } = req.params
+  const { target_directory_id } = req.body || {}
+  if (!target_directory_id) { res.status(400).json({ error: '缺少 target_directory_id' }); return }
+
+  const existing = db.prepare('SELECT id FROM models WHERE id = ?').get(id)
+  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+
+  const targetDir = db.prepare('SELECT id FROM directories WHERE id = ?').get(target_directory_id)
+  if (!targetDir) { res.status(404).json({ error: '目标目录不存在' }); return }
+
+  db.prepare(`UPDATE models SET directory_id = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
+    .run(target_directory_id, id)
+
+  const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
+  res.json(parseRow(row))
+})
+
 // ─── DELETE /api/models/:id ───────────────────────────────
 router.delete('/models/:id', validate(schema.deleteModel), (req, res) => {
   const { id } = req.params

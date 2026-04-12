@@ -124,7 +124,159 @@ export function createBuildingGeometries(
       }
       return [trunk, canopy]
     }
+    case 'ai-circular':
+      return createAICircularGeometries(p)
+    case 'ai-complex':
+      return createAIComplexGeometries(p)
     default:
       return [{ geometry: new THREE.BoxGeometry(10, 30, 10), position: [0, 15, 0] }]
   }
+}
+
+// ─── AI 圆形多层建筑（天坛、圆形塔楼等）─────────────────
+
+/**
+ * params 编码规则：
+ *   segments: 圆形分段数
+ *   levelCount: 层数
+ *   level_{i}_height, level_{i}_radius, level_{i}_roofType, level_{i}_overhang
+ *   roofType 编码: 0=flat, 1=chinese-eave, 2=dome, 3=gable, 4=hip
+ */
+function createAICircularGeometries(p: Record<string, number>): GeometryItem[] {
+  const items: GeometryItem[] = []
+  const seg = p.segments || 48
+  const levelCount = p.levelCount || 1
+  let currentY = 0
+
+  for (let i = 0; i < levelCount; i++) {
+    const h = p[`level_${i}_height`] || 4
+    const r = p[`level_${i}_radius`] || 10
+    const roofCode = p[`level_${i}_roofType`] ?? 0
+    const overhang = p[`level_${i}_overhang`] || 0
+
+    // 主体圆柱
+    items.push({
+      geometry: new THREE.CylinderGeometry(r, r, h, seg),
+      position: [0, currentY + h / 2, 0],
+    })
+
+    // 飞檐 / 屋顶
+    if (roofCode === 1) {
+      // chinese-eave: 用扁圆柱 + 圆锥模拟飞檐
+      const eaveR = r + overhang
+      const eaveThickness = 0.6
+      // 飞檐底盘
+      items.push({
+        geometry: new THREE.CylinderGeometry(eaveR, eaveR * 1.05, eaveThickness, seg),
+        position: [0, currentY + h, 0],
+        color: '__roof__',
+      })
+      // 飞檐上方的锥形坡面
+      const slopeH = overhang * 0.8
+      items.push({
+        geometry: new THREE.ConeGeometry(eaveR, slopeH, seg),
+        position: [0, currentY + h + eaveThickness / 2 + slopeH / 2, 0],
+        color: '__roof__',
+      })
+      // 飞檐是装饰，不影响层间堆叠
+      currentY += h
+    } else if (roofCode === 2) {
+      // dome: 半球穹顶
+      items.push({
+        geometry: new THREE.SphereGeometry(r, seg, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+        position: [0, currentY + h, 0],
+        color: '__roof__',
+      })
+      currentY += h
+    } else {
+      // flat
+      currentY += h
+    }
+  }
+
+  return items
+}
+
+// ─── AI 复杂多层建筑（矩形收分、塔楼等）─────────────────
+
+/**
+ * params 编码规则：
+ *   levelCount: 层数
+ *   level_{i}_height, level_{i}_width, level_{i}_depth, level_{i}_roofType, level_{i}_overhang
+ */
+function createAIComplexGeometries(p: Record<string, number>): GeometryItem[] {
+  const items: GeometryItem[] = []
+  const levelCount = p.levelCount || 1
+  let currentY = 0
+
+  for (let i = 0; i < levelCount; i++) {
+    const h = p[`level_${i}_height`] || 5
+    const w = p[`level_${i}_width`] || 20
+    const d = p[`level_${i}_depth`] || 20
+    const roofCode = p[`level_${i}_roofType`] ?? 0
+    const overhang = p[`level_${i}_overhang`] || 0
+
+    // 主体方块
+    items.push({
+      geometry: new THREE.BoxGeometry(w, h, d),
+      position: [0, currentY + h / 2, 0],
+    })
+
+    // 飞檐 / 屋顶
+    if (roofCode === 1) {
+      // chinese-eave
+      const eaveW = w + overhang * 2
+      const eaveD = d + overhang * 2
+      const eaveThickness = 0.6
+      items.push({
+        geometry: new THREE.BoxGeometry(eaveW, eaveThickness, eaveD),
+        position: [0, currentY + h + eaveThickness / 2, 0],
+        color: '__roof__',
+      })
+      // 坡面用扁的四棱锥近似
+      const slopeH = overhang * 0.7
+      const roofGeom = new THREE.ConeGeometry(Math.max(eaveW, eaveD) * 0.7, slopeH, 4)
+      roofGeom.rotateY(Math.PI / 4)
+      items.push({
+        geometry: roofGeom,
+        position: [0, currentY + h + eaveThickness + slopeH / 2, 0],
+        color: '__roof__',
+      })
+      currentY += h
+    } else if (roofCode === 3) {
+      // gable
+      const rh = Math.max(2, w * 0.2)
+      const hw = w / 2, hd = d / 2
+      const roofGeom = new THREE.BufferGeometry()
+      const vertices = new Float32Array([
+        -hw, 0, -hd, hw, 0, -hd, 0, rh, -hd,
+        -hw, 0, hd, 0, rh, hd, hw, 0, hd,
+        -hw, 0, -hd, 0, rh, -hd, 0, rh, hd, -hw, 0, hd,
+        hw, 0, -hd, hw, 0, hd, 0, rh, hd, 0, rh, -hd,
+      ])
+      const indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 6, 8, 9, 10, 11, 12, 10, 12, 13]
+      roofGeom.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
+      roofGeom.setIndex(indices)
+      roofGeom.computeVertexNormals()
+      items.push({
+        geometry: roofGeom,
+        position: [0, currentY + h, 0],
+        color: '__roof__',
+      })
+      currentY += h
+    } else if (roofCode === 4) {
+      // hip
+      const slopeH = Math.max(2, Math.min(w, d) * 0.25)
+      items.push({
+        geometry: new THREE.ConeGeometry(Math.max(w, d) * 0.7, slopeH, 4),
+        position: [0, currentY + h + slopeH / 2, 0],
+        color: '__roof__',
+      })
+      currentY += h
+    } else {
+      currentY += h
+    }
+  }
+
+  return items
 }

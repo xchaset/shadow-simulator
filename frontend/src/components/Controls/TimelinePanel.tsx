@@ -50,8 +50,8 @@ export function TimelinePanel() {
   }, [setDateTime])
 
   const timeMarks = useMemo(() => ({
-    [sunriseMin]: { style: { fontSize: 9, transform: 'translateX(-50%)' } as const, label: formatTime(sunrise) },
-    [sunsetMin]: { style: { fontSize: 9, transform: 'translateX(-50%)' } as const, label: formatTime(sunset) },
+    [sunriseMin]: { style: { fontSize: 9, color: '#999' } as const, label: formatTime(sunrise) },
+    [sunsetMin]: { style: { fontSize: 9, color: '#999' } as const, label: formatTime(sunset) },
   }), [sunriseMin, sunsetMin, sunrise, sunset])
 
   const timeTooltip = useMemo(() => ({
@@ -65,33 +65,21 @@ export function TimelinePanel() {
   const timeStr = formatTime(dateTime)
 
   return (
-    <div style={{
-      position: 'absolute',
-      right: 12,
-      top: 12,
-      bottom: 12,
-      width: 52,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: 6,
-      zIndex: 10,
-      pointerEvents: 'auto',
-    }}>
-      {/* Date section */}
+    <>
+      {/* ── 日期轴：左侧，无背景 ── */}
       <div style={{
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: 8,
-        padding: '8px 6px',
+        position: 'absolute',
+        left: 12,
+        top: 12,
+        bottom: 60,
+        width: 36,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        flex: 1,
-        minHeight: 0,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        zIndex: 10,
+        pointerEvents: 'auto',
       }}>
-        <CalendarOutlined style={{ fontSize: 13, color: '#666', marginBottom: 2 }} />
+        <CalendarOutlined style={{ fontSize: 13, color: '#888', marginBottom: 2 }} />
         <div style={{ fontSize: 10, color: '#999', marginBottom: 4, whiteSpace: 'nowrap' }}>{dateStr}</div>
         <div style={{ flex: 1, minHeight: 60 }}>
           <Slider
@@ -106,60 +94,45 @@ export function TimelinePanel() {
         </div>
       </div>
 
-      {/* Time section */}
+      {/* ── 时间轴：底部水平，无背景 ── */}
       <div style={{
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: 8,
-        padding: '8px 6px',
+        position: 'absolute',
+        left: 60,
+        right: 12,
+        bottom: 12,
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        flex: 2,
-        minHeight: 0,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        gap: 12,
+        zIndex: 10,
+        pointerEvents: 'auto',
       }}>
-        <ClockCircleOutlined style={{ fontSize: 13, color: '#666', marginBottom: 2 }} />
-        <div style={{ fontSize: 10, color: '#999', marginBottom: 4, whiteSpace: 'nowrap' }}>{timeStr}</div>
-        <div style={{ flex: 1, minHeight: 80 }}>
+        <ClockCircleOutlined style={{ fontSize: 13, color: '#888', flexShrink: 0 }} />
+        <div style={{ fontSize: 10, color: '#999', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeStr}</div>
+        <div style={{ flex: 1 }}>
           <Slider
-            vertical
             min={0}
             max={1440}
             value={currentMinutes}
             onChange={handleTimeChange}
             tooltip={timeTooltip}
             marks={timeMarks}
-            style={{ height: '100%' }}
           />
         </div>
-      </div>
-
-      {/* Playback controls */}
-      <div style={{
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: 8,
-        padding: '6px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 4,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-      }}>
+        {/* 播放控制 */}
         <Button
           type={playback.playing ? 'primary' : 'default'}
           shape="circle"
           size="small"
           icon={playback.playing ? <PauseOutlined /> : <CaretRightOutlined />}
           onClick={() => setPlayback({ playing: !playback.playing })}
+          style={{ flexShrink: 0 }}
         />
         <Select
           value={playback.speed}
           onChange={(v) => setPlayback({ speed: v })}
           size="small"
           variant="borderless"
-          style={{ width: 48, fontSize: 11 }}
+          style={{ width: 52, fontSize: 11, flexShrink: 0 }}
           popupMatchSelectWidth={false}
           options={[
             { value: 1, label: '1x' },
@@ -170,6 +143,6 @@ export function TimelinePanel() {
           ]}
         />
       </div>
-    </div>
+    </>
   )
 }

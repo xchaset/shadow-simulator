@@ -19,7 +19,10 @@ export function sunToLightPosition(
   altitude: number,
   distance = 100,
 ): [number, number, number] {
-  const x = distance * Math.cos(altitude) * Math.sin(azimuth)
+  // SunCalc azimuth: 0=South, clockwise (S→W→N→E)
+  // Three.js (Y-up, right-handed): +Z=South, -Z=North, +X=East, -X=West
+  // Negate X so clockwise-from-south maps correctly: West→-X, East→+X
+  const x = -distance * Math.cos(altitude) * Math.sin(azimuth)
   const y = distance * Math.sin(altitude)
   const z = distance * Math.cos(altitude) * Math.cos(azimuth)
   return [x, y, z]

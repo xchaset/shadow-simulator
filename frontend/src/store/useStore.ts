@@ -45,6 +45,12 @@ export const useStore = create<AppState>((set) => ({
   setPlayback: (p: Partial<PlaybackState>) =>
     set(state => ({ playback: { ...state.playback, ...p } })),
 
+  showGrid: true,
+  setShowGrid: (v: boolean) => set({ showGrid: v }),
+
+  showGrid: true,
+  setShowGrid: (v: boolean) => set({ showGrid: v }),
+
   // ─── Project State ──────────────────────────────────────
 
   directories: [],

@@ -73,4 +73,38 @@ router.delete('/:id', validate(schema.deleteDirectory), (req, res) => {
   res.json({ success: true })
 })
 
+// POST /api/directories/:id/copy — copy directory with all models
+router.post('/:id/copy', validate(schema.deleteDirectory), (req, res) => {
+  const { id } = req.params
+  const existing: any = db.prepare('SELECT * FROM directories WHERE id = ?').get(id)
+  if (!existing) {
+    res.status(404).json({ error: '目录不存在' })
+    return
+  }
+
+  const newId = uuidv4()
+  const newName = existing.name + ' 副本'
+
+  db.prepare(`
+    INSERT INTO directories (id, name, description, sort_order)
+    VALUES (?, ?, ?, ?)
+  `).run(newId, newName, existing.description, existing.sort_order)
+
+  // Copy all models in this directory
+  const models: any[] = db.prepare('SELECT * FROM models WHERE directory_id = ?').all(id)
+  for (const model of models) {
+    const modelId = uuidv4()
+    db.prepare(`
+      INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
+                          city_name, date_time, building_count, scene_data, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(modelId, newId, model.name, model.description, model.location_lat,
+           model.location_lng, model.city_name, model.date_time,
+           model.building_count, model.scene_data, model.sort_order)
+  }
+
+  const row = db.prepare('SELECT * FROM directories WHERE id = ?').get(newId)
+  res.status(201).json(row)
+})
+
 export default router

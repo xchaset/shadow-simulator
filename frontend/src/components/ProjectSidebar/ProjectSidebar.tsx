@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Button, Input, Tree, Dropdown, Modal, message, Tooltip, Empty, Spin,
+  Button, Input, Tree, Dropdown, Modal, message, Tooltip, Empty, Spin, Select,
 } from 'antd'
 import type { InputRef } from 'antd'
 import {
   FolderOutlined, FolderOpenOutlined, FileOutlined,
   PlusOutlined, SaveOutlined, DeleteOutlined, EditOutlined,
   ExclamationCircleOutlined, FolderAddOutlined,
+  CopyOutlined, DragOutlined,
 } from '@ant-design/icons'
 import type { TreeDataNode } from 'antd'
 import { useStore } from '../../store/useStore'
@@ -31,6 +32,10 @@ export function ProjectSidebar() {
   const [renaming, setRenaming] = useState<{ type: 'dir' | 'model'; id: string } | null>(null)
   const renameInputRef = useRef<InputRef>(null)
   const composingRef = useRef(false)
+
+  // Move modal state
+  const [moveModal, setMoveModal] = useState<{ type: 'model'; id: string; currentDirId: string } | null>(null)
+  const [moveTargetDirId, setMoveTargetDirId] = useState<string | null>(null)
 
   // ─── Data fetching ──────────────────────────────────────
 
@@ -132,6 +137,47 @@ export function ProjectSidebar() {
       message.error('重命名失败: ' + err.message)
     }
     setRenaming(null)
+  }
+
+  // ─── Copy / Move operations ─────────────────────────────
+
+  const handleCopyDirectory = async (dir: Directory) => {
+    try {
+      await directoryApi.copy(dir.id)
+      await fetchDirectories()
+      message.success('目录已复制')
+    } catch (err: any) {
+      message.error('复制目录失败: ' + err.message)
+    }
+  }
+
+  const handleCopyModel = async (model: Model) => {
+    try {
+      await modelApi.copy(model.id)
+      await fetchDirectories()
+      message.success('模型已复制')
+    } catch (err: any) {
+      message.error('复制模型失败: ' + err.message)
+    }
+  }
+
+  const handleMoveModelConfirm = async () => {
+    if (!moveModal || !moveTargetDirId) return
+    try {
+      await modelApi.move(moveModal.id, moveTargetDirId)
+      if (currentModelId === moveModal.id) {
+        setCurrentDirectoryId(moveTargetDirId)
+      }
+      await fetchDirectories()
+      setExpandedKeys(prev =>
+        prev.includes(`dir-${moveTargetDirId}`) ? prev : [...prev, `dir-${moveTargetDirId}`]
+      )
+      message.success('模型已移动')
+    } catch (err: any) {
+      message.error('移动失败: ' + err.message)
+    }
+    setMoveModal(null)
+    setMoveTargetDirId(null)
   }
 
   // ─── Model operations ──────────────────────────────────
@@ -273,6 +319,8 @@ export function ProjectSidebar() {
               onClick: () => handleCreateModel(dir.id) },
             { key: 'rename', icon: <EditOutlined />, label: '重命名',
               onClick: () => { setRenaming({ type: 'dir', id: dir.id }) } },
+            { key: 'copy', icon: <CopyOutlined />, label: '复制目录',
+              onClick: () => handleCopyDirectory(dir) },
             { type: 'divider' },
             { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
               onClick: () => handleDeleteDirectory(dir) },
@@ -316,6 +364,14 @@ export function ProjectSidebar() {
             items: [
               { key: 'rename', icon: <EditOutlined />, label: '重命名',
                 onClick: () => { setRenaming({ type: 'model', id: model.id }) } },
+              { key: 'copy', icon: <CopyOutlined />, label: '复制模型',
+                onClick: () => handleCopyModel(model) },
+              { key: 'move', icon: <DragOutlined />, label: '移动到…',
+                disabled: directories.length < 2,
+                onClick: () => {
+                  setMoveTargetDirId(null)
+                  setMoveModal({ type: 'model', id: model.id, currentDirId: model.directory_id })
+                } },
               { type: 'divider' },
               { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
                 onClick: () => handleDeleteModel(model) },
@@ -448,6 +504,36 @@ export function ProjectSidebar() {
           {dirty && <span style={{ color: '#faad14' }}>● 未保存</span>}
         </div>
       )}
+
+      {/* Move Modal */}
+      <Modal
+        title="移动模型"
+        open={!!moveModal}
+        onOk={handleMoveModelConfirm}
+        onCancel={() => {
+          setMoveModal(null)
+          setMoveTargetDirId(null)
+        }}
+        okText="移动"
+        cancelText="取消"
+        okButtonProps={{ disabled: !moveTargetDirId || moveTargetDirId === moveModal?.currentDirId }}
+      >
+        <div style={{ marginTop: 16 }}>
+          <div style={{ marginBottom: 8, fontSize: 13, color: '#666' }}>选择目标目录：</div>
+          <Select
+            style={{ width: '100%' }}
+            placeholder="请选择目录"
+            value={moveTargetDirId}
+            onChange={setMoveTargetDirId}
+            options={directories
+              .filter(d => d.id !== moveModal?.currentDirId)
+              .map(d => ({
+                value: d.id,
+                label: `${d.name} (${models[d.id]?.length || 0} 个模型)`,
+              }))}
+          />
+        </div>
+      </Modal>
     </div>
   )
 }

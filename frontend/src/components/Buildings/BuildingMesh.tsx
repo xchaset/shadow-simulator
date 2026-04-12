@@ -51,7 +51,11 @@ export function BuildingMesh({ building }: Props) {
           receiveShadow
         >
           <meshStandardMaterial
-            color={item.color ?? building.color}
+            color={
+              item.color === '__roof__'
+                ? (building.params as any).roofColor || building.color
+                : item.color ?? building.color
+            }
             transparent={isSelected}
             opacity={isSelected ? 0.85 : 1}
           />

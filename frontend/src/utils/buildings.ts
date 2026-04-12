@@ -90,6 +90,18 @@ export const BUILDING_PRESETS: Record<BuildingType, BuildingPreset> = {
     paramLabels: { trunkHeight: '树干高', trunkRadius: '树干半径', canopyRadius: '树冠半径', canopyHeight: '树冠高' },
     defaultColor: '#2E7D32',
   },
+  'ai-circular': {
+    label: 'AI 圆形建筑',
+    icon: 'RadarChartOutlined',
+    defaultParams: { radius: 15, segments: 48, levels: 3 },
+    paramLabels: { radius: '半径', segments: '分段数', levels: '层数' },
+  },
+  'ai-complex': {
+    label: 'AI 复杂建筑',
+    icon: 'AppstoreOutlined',
+    defaultParams: { levels: 3 },
+    paramLabels: { levels: '层数' },
+  },
 }
 
 const COLORS = [

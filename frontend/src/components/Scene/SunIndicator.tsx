@@ -7,27 +7,39 @@ import { getSunData, sunToLightPosition } from '../../utils/sunCalc'
 
 /** 太阳轨迹弧线上的采样点数 */
 const SAMPLES = 120
-/** 太阳指示球 & 轨迹弧线的半径（距场景中心的距离） */
-const ARC_RADIUS = 80
+/** 太阳轨迹弧线的最小半径 */
+const MIN_ARC_RADIUS = 80
+/** 弧线半径相对最高建筑的倍数（保证太阳始终高于建筑） */
+const ARC_RADIUS_FACTOR = 3.0
 
 export function SunIndicator() {
   const { lightPosition, isNight, altitude } = useSunPosition()
   const location = useStore(s => s.location)
   const dateTime = useStore(s => s.dateTime)
+  const buildings = useStore(s => s.buildings)
+
+  // ── 动态弧线半径：根据最高建筑自适应 ──
+  const arcRadius = useMemo(() => {
+    const maxHeight = buildings.reduce((max, b) => {
+      const h = b.params.height ?? 0
+      return h > max ? h : max
+    }, 0)
+    return Math.max(MIN_ARC_RADIUS, maxHeight * ARC_RADIUS_FACTOR)
+  }, [buildings])
 
   // ── 当前太阳位置（归一化到弧线半径） ──
   const sunPos: [number, number, number] = useMemo(() => {
     const len = Math.sqrt(
       lightPosition[0] ** 2 + lightPosition[1] ** 2 + lightPosition[2] ** 2,
     )
-    if (len === 0) return [0, ARC_RADIUS, 0]
-    const scale = ARC_RADIUS / len
+    if (len === 0) return [0, arcRadius, 0]
+    const scale = arcRadius / len
     return [
       lightPosition[0] * scale,
-      Math.max(lightPosition[1] * scale, 2), // 保证不沉入地面
+      Math.max(lightPosition[1] * scale, 2),
       lightPosition[2] * scale,
     ]
-  }, [lightPosition])
+  }, [lightPosition, arcRadius])
 
   // ── 全天轨迹弧线（日出→日落） ──
   const pathPoints = useMemo(() => {
@@ -38,13 +50,12 @@ export function SunIndicator() {
     for (let i = 0; i <= SAMPLES; i++) {
       const t = new Date(day.getTime() + (i / SAMPLES) * 86400000)
       const data = getSunData(location.lat, location.lng, t)
-      // 只画地平线以上的部分
       if (data.altitude < 0) continue
-      const pos = sunToLightPosition(data.azimuth, data.altitude, ARC_RADIUS)
+      const pos = sunToLightPosition(data.azimuth, data.altitude, arcRadius)
       pts.push(new THREE.Vector3(pos[0], Math.max(pos[1], 0.5), pos[2]))
     }
     return pts
-  }, [location.lat, location.lng, dateTime])
+  }, [location.lat, location.lng, dateTime, arcRadius])
 
   // ── 太阳到地面的投影虚线 ──
   const projLine = useMemo(() => {

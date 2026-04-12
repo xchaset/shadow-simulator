@@ -43,6 +43,9 @@ export const directoryApi = {
 
   delete: (id: string) =>
     request<{ success: boolean }>(`/directories/${id}`, { method: 'DELETE' }),
+
+  copy: (id: string) =>
+    request<DirectoryDTO>(`/directories/${id}/copy`, { method: 'POST' }),
 }
 
 // ─── Model API ────────────────────────────────────────────
@@ -105,4 +108,16 @@ export const modelApi = {
 
   delete: (id: string) =>
     request<{ success: boolean }>(`/models/${id}`, { method: 'DELETE' }),
+
+  copy: (id: string, targetDirectoryId?: string) =>
+    request<ModelDTO>(`/models/${id}/copy`, {
+      method: 'POST',
+      body: JSON.stringify({ target_directory_id: targetDirectoryId }),
+    }),
+
+  move: (id: string, targetDirectoryId: string) =>
+    request<ModelDTO>(`/models/${id}/move`, {
+      method: 'PUT',
+      body: JSON.stringify({ target_directory_id: targetDirectoryId }),
+    }),
 }

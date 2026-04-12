@@ -83,6 +83,94 @@ export function BuildingImporter() {
     flat: '平顶',
     gable: '人字顶',
     hip: '四坡顶',
+    'chinese-eave': '中式飞檐',
+    dome: '穹顶',
+  }
+
+  /** 根据 shape 类型渲染不同的分析结果 */
+  const renderAnalysisResult = (p: BuildingAnalysisParams) => {
+    if ((p.shape === 'circular' || p.shape === 'complex') && p.levels?.length) {
+      // 多层建筑
+      const totalHeight = p.levels.reduce((sum, lv) => sum + lv.height, 0)
+      return (
+        <Descriptions bordered size="small" column={2} title="分析结果" style={{ marginTop: 8 }}>
+          <Descriptions.Item label="建筑类型">
+            <Tag color="purple">{p.shape === 'circular' ? '圆形多层' : '复杂多层'}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="层数">
+            {p.levels.length} 层
+          </Descriptions.Item>
+          {p.shape === 'circular' && p.radius && (
+            <Descriptions.Item label="底层半径">
+              {p.radius} 米
+            </Descriptions.Item>
+          )}
+          <Descriptions.Item label="总高度（估算）">
+            {totalHeight.toFixed(1)} 米
+          </Descriptions.Item>
+          <Descriptions.Item label="各层结构" span={2}>
+            {p.levels.map((lv, i) => (
+              <div key={i} style={{ fontSize: 12, lineHeight: '20px' }}>
+                第{i + 1}层：高 {lv.height}m
+                {lv.radius != null && `，半径 ${lv.radius}m`}
+                {lv.width != null && `，宽 ${lv.width}m`}
+                {lv.depth != null && `，深 ${lv.depth}m`}
+                ，{roofLabel[lv.roofType] || lv.roofType}
+                {lv.roofOverhang ? `（出挑 ${lv.roofOverhang}m）` : ''}
+              </div>
+            ))}
+          </Descriptions.Item>
+          <Descriptions.Item label="墙体颜色">
+            <span style={{ display: 'inline-block', width: 16, height: 16, background: p.material.wallColor, border: '1px solid #d9d9d9', borderRadius: 2, verticalAlign: 'middle', marginRight: 6 }} />
+            {p.material.wallColor}
+          </Descriptions.Item>
+          <Descriptions.Item label="屋顶颜色">
+            <span style={{ display: 'inline-block', width: 16, height: 16, background: p.material.roofColor, border: '1px solid #d9d9d9', borderRadius: 2, verticalAlign: 'middle', marginRight: 6 }} />
+            {p.material.roofColor}
+          </Descriptions.Item>
+        </Descriptions>
+      )
+    }
+
+    // 简单矩形建筑
+    const floors = p.floors || 1
+    const floorHeight = p.floorHeight || 3
+    return (
+      <Descriptions bordered size="small" column={2} title="分析结果" style={{ marginTop: 8 }}>
+        <Descriptions.Item label="楼层数">
+          {floors} 层
+        </Descriptions.Item>
+        <Descriptions.Item label="层高">
+          {floorHeight} 米
+        </Descriptions.Item>
+        <Descriptions.Item label="宽度">
+          {p.width} 米
+        </Descriptions.Item>
+        <Descriptions.Item label="进深">
+          {p.depth} 米
+        </Descriptions.Item>
+        <Descriptions.Item label="总高度">
+          {floors * floorHeight} 米
+        </Descriptions.Item>
+        <Descriptions.Item label="屋顶类型">
+          <Tag color="blue">{roofLabel[p.roofType || 'flat'] || p.roofType}</Tag>
+        </Descriptions.Item>
+        <Descriptions.Item label="墙体颜色">
+          <span style={{ display: 'inline-block', width: 16, height: 16, background: p.material.wallColor, border: '1px solid #d9d9d9', borderRadius: 2, verticalAlign: 'middle', marginRight: 6 }} />
+          {p.material.wallColor}
+        </Descriptions.Item>
+        <Descriptions.Item label="屋顶颜色">
+          <span style={{ display: 'inline-block', width: 16, height: 16, background: p.material.roofColor, border: '1px solid #d9d9d9', borderRadius: 2, verticalAlign: 'middle', marginRight: 6 }} />
+          {p.material.roofColor}
+        </Descriptions.Item>
+        {p.windowLayout && (
+          <Descriptions.Item label="窗户布局" span={2}>
+            {p.windowLayout.cols} 列 × {p.windowLayout.rows} 行，
+            单窗 {p.windowLayout.width}×{p.windowLayout.height} 米
+          </Descriptions.Item>
+        )}
+      </Descriptions>
+    )
   }
 
   return (
@@ -162,68 +250,7 @@ export function BuildingImporter() {
             )}
 
             {/* 分析结果 */}
-            {params && !loading && (
-              <Descriptions
-                bordered
-                size="small"
-                column={2}
-                title="分析结果"
-                style={{ marginTop: 8 }}
-              >
-                <Descriptions.Item label="楼层数">
-                  {params.floors} 层
-                </Descriptions.Item>
-                <Descriptions.Item label="层高">
-                  {params.floorHeight} 米
-                </Descriptions.Item>
-                <Descriptions.Item label="宽度">
-                  {params.width} 米
-                </Descriptions.Item>
-                <Descriptions.Item label="进深">
-                  {params.depth} 米
-                </Descriptions.Item>
-                <Descriptions.Item label="总高度">
-                  {params.floors * params.floorHeight} 米
-                </Descriptions.Item>
-                <Descriptions.Item label="屋顶类型">
-                  <Tag color="blue">{roofLabel[params.roofType] || params.roofType}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="墙体颜色" span={1}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: 16,
-                      height: 16,
-                      background: params.material.wallColor,
-                      border: '1px solid #d9d9d9',
-                      borderRadius: 2,
-                      verticalAlign: 'middle',
-                      marginRight: 6,
-                    }}
-                  />
-                  {params.material.wallColor}
-                </Descriptions.Item>
-                <Descriptions.Item label="屋顶颜色" span={1}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: 16,
-                      height: 16,
-                      background: params.material.roofColor,
-                      border: '1px solid #d9d9d9',
-                      borderRadius: 2,
-                      verticalAlign: 'middle',
-                      marginRight: 6,
-                    }}
-                  />
-                  {params.material.roofColor}
-                </Descriptions.Item>
-                <Descriptions.Item label="窗户布局" span={2}>
-                  {params.windowLayout.cols} 列 × {params.windowLayout.rows} 行，
-                  单窗 {params.windowLayout.width}×{params.windowLayout.height} 米
-                </Descriptions.Item>
-              </Descriptions>
-            )}
+            {params && !loading && renderAnalysisResult(params)}
 
             {/* 重新选择图片 */}
             {!loading && (

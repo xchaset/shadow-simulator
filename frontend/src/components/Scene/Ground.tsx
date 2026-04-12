@@ -1,8 +1,12 @@
+import { useStore } from '../../store/useStore'
+
 interface GroundProps {
   onClick?: () => void
 }
 
 export function Ground({ onClick }: GroundProps) {
+  const showGrid = useStore(s => s.showGrid)
+
   return (
     <group>
       <mesh
@@ -11,10 +15,12 @@ export function Ground({ onClick }: GroundProps) {
         position={[0, 0, 0]}
         onClick={onClick}
       >
-        <planeGeometry args={[200, 200]} />
+        <planeGeometry args={[500, 500]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
-      <gridHelper args={[200, 40, '#cccccc', '#dddddd']} position={[0, 0.01, 0]} />
+      {showGrid && (
+        <gridHelper args={[500, 50, '#cccccc', '#dddddd']} position={[0, 0.01, 0]} />
+      )}
     </group>
   )
 }
