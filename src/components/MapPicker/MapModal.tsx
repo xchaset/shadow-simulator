@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal, InputNumber, Input, Space, message } from 'antd'
+import { Modal, InputNumber, Input, Space, App } from 'antd'
 import { EnvironmentOutlined } from '@ant-design/icons'
 import { useStore } from '../../store/useStore'
 
@@ -11,6 +11,7 @@ interface Props {
 export function MapModal({ open, onClose }: Props) {
   const location = useStore(s => s.location)
   const setLocation = useStore(s => s.setLocation)
+  const { message } = App.useApp()
 
   const [lat, setLat] = useState(location.lat)
   const [lng, setLng] = useState(location.lng)

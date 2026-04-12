@@ -5,6 +5,7 @@ export interface BuildingPreset {
   icon: string
   defaultParams: Record<string, number>
   paramLabels: Record<string, string>
+  defaultColor?: string
 }
 
 export const BUILDING_PRESETS: Record<BuildingType, BuildingPreset> = {
@@ -68,6 +69,27 @@ export const BUILDING_PRESETS: Record<BuildingType, BuildingPreset> = {
     defaultParams: { width: 20, depth: 25, wallHeight: 12, ridgeHeight: 8 },
     paramLabels: { width: '宽度', depth: '进深', wallHeight: '墙高', ridgeHeight: '屋脊高' },
   },
+  road: {
+    label: '道路',
+    icon: '🛣️',
+    defaultParams: { length: 80, width: 12 },
+    paramLabels: { length: '长度', width: '宽度' },
+    defaultColor: '#708090',
+  },
+  'green-belt': {
+    label: '绿化带',
+    icon: '🌿',
+    defaultParams: { length: 60, width: 6, height: 1.5 },
+    paramLabels: { length: '长度', width: '宽度', height: '高度' },
+    defaultColor: '#4CAF50',
+  },
+  tree: {
+    label: '树木',
+    icon: '🌳',
+    defaultParams: { trunkHeight: 5, trunkRadius: 0.8, canopyRadius: 5, canopyHeight: 8 },
+    paramLabels: { trunkHeight: '树干高', trunkRadius: '树干半径', canopyRadius: '树冠半径', canopyHeight: '树冠高' },
+    defaultColor: '#2E7D32',
+  },
 }
 
 const COLORS = [
@@ -82,7 +104,8 @@ export function getDefaultParams(type: BuildingType): Record<string, number> {
 }
 
 export function createBuilding(type: BuildingType, position: [number, number] = [0, 0]): Building {
-  const color = COLORS[colorIndex % COLORS.length]
+  const preset = BUILDING_PRESETS[type]
+  const color = preset.defaultColor ?? COLORS[colorIndex % COLORS.length]
   colorIndex++
   return {
     id: `building-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,

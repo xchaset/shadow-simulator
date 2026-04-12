@@ -1,7 +1,10 @@
+import { useMemo, useCallback, useRef } from 'react'
 import { Slider } from 'antd'
 import { useStore } from '../../store/useStore'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { formatTime } from '../../utils/sunCalc'
+
+const SLIDER_STYLE = { margin: '0 8px' }
 
 export function TimeSlider() {
   const dateTime = useStore(s => s.dateTime)
@@ -12,11 +15,27 @@ export function TimeSlider() {
   const sunriseMin = sunrise.getHours() * 60 + sunrise.getMinutes()
   const sunsetMin = sunset.getHours() * 60 + sunset.getMinutes()
 
-  const handleChange = (value: number) => {
-    const newDate = new Date(dateTime)
+  // Keep a ref so the stable callback always reads the latest dateTime
+  const dateTimeRef = useRef(dateTime)
+  dateTimeRef.current = dateTime
+
+  const handleChange = useCallback((value: number) => {
+    const newDate = new Date(dateTimeRef.current)
     newDate.setHours(Math.floor(value / 60), value % 60, 0, 0)
     setDateTime(newDate)
-  }
+  }, [setDateTime])
+
+  const marks = useMemo(() => ({
+    [sunriseMin]: { style: { fontSize: 10 } as const, label: '🌅' },
+    [sunsetMin]: { style: { fontSize: 10 } as const, label: '🌇' },
+  }), [sunriseMin, sunsetMin])
+
+  const tooltip = useMemo(() => ({
+    formatter: (v: number | undefined) =>
+      v != null
+        ? `${Math.floor(v / 60).toString().padStart(2, '0')}:${(v % 60).toString().padStart(2, '0')}`
+        : '',
+  }), [])
 
   return (
     <div style={{ flex: 1 }}>
@@ -29,12 +48,9 @@ export function TimeSlider() {
         max={1440}
         value={currentMinutes}
         onChange={handleChange}
-        tooltip={{ formatter: (v) => v ? `${Math.floor(v/60).toString().padStart(2,'0')}:${(v%60).toString().padStart(2,'0')}` : '' }}
-        marks={{
-          [sunriseMin]: { style: { fontSize: 10 }, label: '🌅' },
-          [sunsetMin]: { style: { fontSize: 10 }, label: '🌇' },
-        }}
-        style={{ margin: '0 8px' }}
+        tooltip={tooltip}
+        marks={marks}
+        style={SLIDER_STYLE}
       />
     </div>
   )

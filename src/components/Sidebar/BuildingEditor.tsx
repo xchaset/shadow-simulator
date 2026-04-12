@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react'
 import { useStore } from '../../store/useStore'
 import { BUILDING_PRESETS } from '../../utils/buildings'
 import { InputNumber, Slider, Button, ColorPicker } from 'antd'
@@ -10,6 +11,19 @@ export function BuildingEditor() {
   const removeBuilding = useStore(s => s.removeBuilding)
 
   const building = buildings.find(b => b.id === selectedId)
+
+  const handleRotationChange = useCallback((v: number) => {
+    if (building) updateBuilding(building.id, { rotation: v })
+  }, [building?.id, updateBuilding])
+
+  const handleColorChange = useCallback((_: unknown, hex: string) => {
+    if (building) updateBuilding(building.id, { color: hex })
+  }, [building?.id, updateBuilding])
+
+  const handleDelete = useCallback(() => {
+    if (building) removeBuilding(building.id)
+  }, [building?.id, removeBuilding])
+
   if (!building) {
     return <div style={{ padding: 16, color: '#999', fontSize: 13 }}>选择一个建筑物进行编辑</div>
   }
@@ -50,7 +64,7 @@ export function BuildingEditor() {
           min={0}
           max={360}
           value={building.rotation}
-          onChange={(v) => updateBuilding(building.id, { rotation: v })}
+          onChange={handleRotationChange}
         />
       </div>
 
@@ -59,7 +73,7 @@ export function BuildingEditor() {
         <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>颜色</div>
         <ColorPicker
           value={building.color}
-          onChange={(_, hex) => updateBuilding(building.id, { color: hex })}
+          onChange={handleColorChange}
           size="small"
         />
       </div>
@@ -69,7 +83,7 @@ export function BuildingEditor() {
         danger
         size="small"
         icon={<DeleteOutlined />}
-        onClick={() => removeBuilding(building.id)}
+        onClick={handleDelete}
         block
       >
         删除建筑

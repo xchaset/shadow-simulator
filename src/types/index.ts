@@ -9,6 +9,9 @@ export type BuildingType =
   | 'podium-tower'
   | 'dome'
   | 'gable-roof'
+  | 'road'
+  | 'green-belt'
+  | 'tree'
 
 export interface Building {
   id: string
@@ -50,6 +53,10 @@ export interface AppState {
   removeBuilding: (id: string) => void
   selectedBuildingId: string | null
   selectBuilding: (id: string | null) => void
+  editorOpen: boolean
+  setEditorOpen: (v: boolean) => void
+  isDragging: boolean
+  setDragging: (v: boolean) => void
   playback: PlaybackState
   setPlayback: (p: Partial<PlaybackState>) => void
 }

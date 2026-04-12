@@ -5,6 +5,7 @@ import { getDefaultParams } from '../../utils/buildings'
 export interface GeometryItem {
   geometry: THREE.BufferGeometry
   position: [number, number, number]
+  color?: string  // 覆盖建筑默认颜色（如树干用棕色）
 }
 
 export function createBuildingGeometries(
@@ -96,6 +97,32 @@ export function createBuildingGeometries(
         { geometry: new THREE.BoxGeometry(p.width, p.wallHeight, p.depth), position: [0, p.wallHeight / 2, 0] },
         { geometry: roofGeom, position: [0, p.wallHeight, 0] },
       ]
+    }
+    case 'road':
+      return [{
+        geometry: new THREE.BoxGeometry(p.width, 0.15, p.length),
+        position: [0, 0.075, 0],
+      }]
+    case 'green-belt':
+      return [{
+        geometry: new THREE.BoxGeometry(p.width, p.height, p.length),
+        position: [0, p.height / 2, 0],
+      }]
+    case 'tree': {
+      // 树干（棕色圆柱）
+      const trunk: GeometryItem = {
+        geometry: new THREE.CylinderGeometry(p.trunkRadius, p.trunkRadius * 1.2, p.trunkHeight, 8),
+        position: [0, p.trunkHeight / 2, 0],
+        color: '#8B5E3C',
+      }
+      // 树冠（绿色椭球）
+      const canopyGeom = new THREE.SphereGeometry(p.canopyRadius, 16, 12)
+      canopyGeom.scale(1, p.canopyHeight / (p.canopyRadius * 2), 1)
+      const canopy: GeometryItem = {
+        geometry: canopyGeom,
+        position: [0, p.trunkHeight + p.canopyHeight / 2, 0],
+      }
+      return [trunk, canopy]
     }
     default:
       return [{ geometry: new THREE.BoxGeometry(10, 30, 10), position: [0, 15, 0] }]

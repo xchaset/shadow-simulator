@@ -31,7 +31,15 @@ export const useStore = create<AppState>((set) => ({
 
   selectedBuildingId: null,
 
-  selectBuilding: (id: string | null) => set({ selectedBuildingId: id }),
+  selectBuilding: (id: string | null) => set({ selectedBuildingId: id, editorOpen: false }),
+
+  editorOpen: false,
+
+  setEditorOpen: (v: boolean) => set({ editorOpen: v }),
+
+  isDragging: false,
+
+  setDragging: (v: boolean) => set({ isDragging: v }),
 
   playback: { playing: false, speed: 1 },
 
