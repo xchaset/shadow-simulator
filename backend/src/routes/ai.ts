@@ -73,40 +73,63 @@ async function analyzeBuildingImage(base64Image: string): Promise<BuildingParams
 }
 
 /**
+ * 从 data URL 中提取 media type，fallback 为 image/jpeg
+ */
+function detectMediaType(base64Image: string): string {
+  const match = base64Image.match(/^data:(image\/\w+);base64,/)
+  return match ? match[1] : 'image/jpeg'
+}
+
+/**
+ * 从 LLM 响应文本中提取 JSON
+ */
+function extractJSON(text: string): BuildingParams {
+  // 1. 尝试匹配 markdown 代码块中的 JSON
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeBlockMatch) {
+    return JSON.parse(codeBlockMatch[1].trim())
+  }
+
+  // 2. 尝试匹配最外层的 { ... }
+  //    使用贪婪匹配找到最后一个 }
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0])
+  }
+
+  throw new Error('No JSON found in response')
+}
+
+/**
  * 使用 Claude 分析建筑图片
  */
 async function analyzeWithClaude(base64Image: string, apiKey: string): Promise<BuildingParams> {
-  const prompt = `分析这张建筑物图片，提取以下信息并以 JSON 格式返回：
+  const prompt = `你是一个建筑分析专家。请分析这张建筑物图片，返回一个 JSON 对象。
 
-{
-  "floors": 楼层数（整数，目测可见楼层），
-  "width": 建筑宽度估算（米，基于常见窗户宽度1.5米推算），
-  "depth": 建筑进深估算（米，如果看不到侧面则设为 width * 0.7），
-  "floorHeight": 层高（米，一般住宅3米，办公3.5米），
-  "roofType": "flat" | "gable" | "hip"（平顶/人字顶/四坡顶），
-  "windowLayout": {
-    "rows": 每层窗户行数,
-    "cols": 每行窗户列数,
-    "width": 单个窗户宽度（米）,
-    "height": 单个窗户高度（米）
-  },
-  "material": {
-    "wallColor": 墙体主色调（CSS 颜色，如 "#E8E8E8"）,
-    "roofColor": 屋顶颜色（CSS 颜色）
-  }
-}
+必须严格按照以下格式返回，不要添加任何其他文字、解释或 markdown 标记：
 
-要求：
-1. 只返回 JSON，不要其他文字
-2. 数值要合理（楼层1-50，宽度10-100米）
-3. 如果图片不清晰，给出保守估计
-4. 颜色用十六进制格式`
+{"floors":5,"width":30,"depth":20,"floorHeight":3,"roofType":"flat","windowLayout":{"rows":1,"cols":5,"width":1.5,"height":1.8},"material":{"wallColor":"#E8E8E8","roofColor":"#808080"}}
 
-  const imageData = base64Image.startsWith('data:')
+字段说明：
+- floors: 楼层数（整数，1-50）
+- width: 建筑宽度（米，10-100）
+- depth: 建筑进深（米，看不到侧面则设为 width×0.7）
+- floorHeight: 层高（米，住宅3，办公3.5）
+- roofType: "flat"（平顶）或 "gable"（人字顶）或 "hip"（四坡顶）
+- windowLayout: 窗户布局
+- material.wallColor: 墙体颜色（十六进制）
+- material.roofColor: 屋顶颜色（十六进制）
+
+直接返回 JSON，不要用代码块包裹。`
+
+  const mediaType = detectMediaType(base64Image)
+  const imageData = base64Image.includes(',')
     ? base64Image.split(',')[1]
     : base64Image
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'
+
+  const response = await fetch(`${baseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -114,7 +137,7 @@ async function analyzeWithClaude(base64Image: string, apiKey: string): Promise<B
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
+      model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       messages: [
         {
@@ -124,14 +147,11 @@ async function analyzeWithClaude(base64Image: string, apiKey: string): Promise<B
               type: 'image',
               source: {
                 type: 'base64',
-                media_type: 'image/jpeg',
+                media_type: mediaType,
                 data: imageData,
               },
             },
-            {
-              type: 'text',
-              text: prompt,
-            },
+            { type: 'text', text: prompt },
           ],
         },
       ],
@@ -139,20 +159,30 @@ async function analyzeWithClaude(base64Image: string, apiKey: string): Promise<B
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`Claude API error: ${JSON.stringify(error)}`)
+    const errBody = await response.text()
+    console.error('Claude API HTTP error:', response.status, errBody)
+    throw new Error(`Claude API error (${response.status}): ${errBody.slice(0, 200)}`)
   }
 
   const result = await response.json()
-  const text = result.content[0].text
 
-  // 提取 JSON（可能被包裹在 markdown 代码块中）
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error('Failed to extract JSON from Claude response')
+  // 安全地提取文本
+  const textBlock = result.content?.find((b: any) => b.type === 'text')
+  const text = textBlock?.text ?? ''
+
+  if (!text) {
+    console.error('Claude returned empty text. Full response:', JSON.stringify(result).slice(0, 500))
+    throw new Error('Claude returned empty response')
   }
 
-  return JSON.parse(jsonMatch[0])
+  console.log('Claude raw response:', text.slice(0, 300))
+
+  try {
+    return extractJSON(text)
+  } catch (parseErr) {
+    console.error('JSON parse failed. Raw text:', text)
+    throw new Error(`Failed to parse building params from Claude response: ${(parseErr as Error).message}`)
+  }
 }
 
 /**
@@ -212,14 +242,21 @@ async function analyzeWithOpenAI(base64Image: string, apiKey: string): Promise<B
   }
 
   const result = await response.json()
-  const text = result.choices[0].message.content
+  const text = result.choices?.[0]?.message?.content ?? ''
 
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error('Failed to extract JSON from OpenAI response')
+  if (!text) {
+    console.error('OpenAI returned empty text. Full response:', JSON.stringify(result).slice(0, 500))
+    throw new Error('OpenAI returned empty response')
   }
 
-  return JSON.parse(jsonMatch[0])
+  console.log('OpenAI raw response:', text.slice(0, 300))
+
+  try {
+    return extractJSON(text)
+  } catch (parseErr) {
+    console.error('JSON parse failed. Raw text:', text)
+    throw new Error(`Failed to parse building params from OpenAI response: ${(parseErr as Error).message}`)
+  }
 }
 
 export default router
