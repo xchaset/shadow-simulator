@@ -14,6 +14,7 @@ export type BuildingType =
   | 'tree'
   | 'ai-circular'
   | 'ai-complex'
+  | 'glb'
 
 export interface Building {
   id: string
@@ -23,6 +24,8 @@ export interface Building {
   position: [x: number, z: number]
   rotation: number
   color: string
+  glbUrl?: string  // GLB 模型文件 URL（仅 type='glb' 时使用）
+  glbScale?: number  // GLB 模型缩放比例（默认 1）
 }
 
 export interface Location {

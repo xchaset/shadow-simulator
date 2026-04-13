@@ -14,6 +14,34 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+// ─── GLB Upload API ───────────────────────────────────────
+
+export interface GlbUploadResult {
+  success: boolean
+  url: string
+  filename: string
+  size: number
+}
+
+export const glbApi = {
+  upload: async (file: File): Promise<GlbUploadResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch(`${API_BASE}/upload/glb`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }))
+      throw new Error(err.error || `HTTP ${res.status}`)
+    }
+    return res.json()
+  },
+
+  delete: (filename: string) =>
+    request<{ success: boolean }>(`/uploads/glb/${filename}`, { method: 'DELETE' }),
+}
+
 // ─── Directory API ────────────────────────────────────────
 
 export interface DirectoryDTO {

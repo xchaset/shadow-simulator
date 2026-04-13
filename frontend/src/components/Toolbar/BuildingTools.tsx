@@ -4,6 +4,9 @@ import type { BuildingType } from '../../types'
 import { Button, Tooltip } from 'antd'
 import { BuildingIcon } from '../BuildingIcon'
 
+// GLB 类型不在快捷工具栏显示（需要通过 GlbImporter 上传文件）
+const EXCLUDED_TYPES: BuildingType[] = ['glb']
+
 export function BuildingTools() {
   const addBuilding = useStore(s => s.addBuilding)
 
@@ -16,16 +19,18 @@ export function BuildingTools() {
 
   return (
     <div style={{ display: 'flex', gap: 4 }}>
-      {(Object.entries(BUILDING_PRESETS) as [BuildingType, any][]).map(([type, preset]) => (
-        <Tooltip key={type} title={preset.label}>
-          <Button
-            size="small"
-            onClick={() => handleAdd(type)}
-          >
-            <BuildingIcon name={preset.icon} />
-          </Button>
-        </Tooltip>
-      ))}
+      {(Object.entries(BUILDING_PRESETS) as [BuildingType, any][])
+        .filter(([type]) => !EXCLUDED_TYPES.includes(type))
+        .map(([type, preset]) => (
+          <Tooltip key={type} title={preset.label}>
+            <Button
+              size="small"
+              onClick={() => handleAdd(type)}
+            >
+              <BuildingIcon name={preset.icon} />
+            </Button>
+          </Tooltip>
+        ))}
     </div>
   )
 }

@@ -12,6 +12,9 @@ import {
   LineOutlined,
   BgColorsOutlined,
   PartitionOutlined,
+  RadarChartOutlined,
+  AppstoreOutlined,
+  FileOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
@@ -29,6 +32,9 @@ const ICON_MAP: Record<string, ReactNode> = {
   LineOutlined: <LineOutlined />,
   BgColorsOutlined: <BgColorsOutlined />,
   PartitionOutlined: <PartitionOutlined />,
+  RadarChartOutlined: <RadarChartOutlined />,
+  AppstoreOutlined: <AppstoreOutlined />,
+  FileOutlined: <FileOutlined />,
 }
 
 export function BuildingIcon({ name }: { name: string }) {

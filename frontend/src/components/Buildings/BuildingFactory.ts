@@ -128,6 +128,9 @@ export function createBuildingGeometries(
       return createAICircularGeometries(p)
     case 'ai-complex':
       return createAIComplexGeometries(p)
+    case 'glb':
+      // GLB 模型由 GlbBuildingMesh 组件单独处理，这里返回占位几何体
+      return [{ geometry: new THREE.BoxGeometry(10, 10, 10), position: [0, 5, 0] }]
     default:
       return [{ geometry: new THREE.BoxGeometry(10, 30, 10), position: [0, 15, 0] }]
   }

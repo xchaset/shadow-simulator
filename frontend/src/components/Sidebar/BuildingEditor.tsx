@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useStore } from '../../store/useStore'
 import { BUILDING_PRESETS } from '../../utils/buildings'
-import { InputNumber, Slider, Button, ColorPicker } from 'antd'
+import { InputNumber, Slider, Button, ColorPicker, Tag } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
 import { BuildingIcon } from '../BuildingIcon'
 
@@ -33,31 +33,75 @@ export function BuildingEditor({ editingId }: Props) {
   }
 
   const preset = BUILDING_PRESETS[building.type]
+  const isGlb = building.type === 'glb'
 
   const handleParamChange = (key: string, value: number | null) => {
     if (value === null) return
-    updateBuilding(building.id, {
+    const updates: Partial<typeof building> = {
       params: { ...building.params, [key]: value },
-    })
+    }
+    // GLB 模型的 scale 参数同步到 glbScale
+    if (isGlb && key === 'scale') {
+      updates.glbScale = value
+    }
+    updateBuilding(building.id, updates)
   }
 
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <BuildingIcon name={preset.icon} /> {building.name}
+        <BuildingIcon name={preset?.icon || 'FileOutlined'} /> {building.name}
+        {isGlb && <Tag color="blue" style={{ marginLeft: 4 }}>GLB</Tag>}
       </div>
 
+      {/* GLB 模型信息 */}
+      {isGlb && building.glbUrl && (
+        <div style={{
+          marginBottom: 12,
+          padding: 8,
+          background: '#f6f8fa',
+          borderRadius: 6,
+          fontSize: 12,
+          color: '#666',
+          wordBreak: 'break-all',
+        }}>
+          📦 {building.glbUrl.split('/').pop()}
+        </div>
+      )}
+
       {/* Parameters */}
-      {Object.entries(preset.paramLabels).map(([key, label]) => (
+      {preset && Object.entries(preset.paramLabels).map(([key, label]) => (
         <div key={key} style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>{label}</div>
-          <InputNumber
-            size="small"
-            value={building.params[key]}
-            min={1}
-            onChange={(v) => handleParamChange(key, v)}
-            style={{ width: '100%' }}
-          />
+          {isGlb && key === 'scale' ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Slider
+                min={0.01}
+                max={10}
+                step={0.01}
+                value={building.params[key] ?? 1}
+                onChange={(v) => handleParamChange(key, v)}
+                style={{ flex: 1 }}
+              />
+              <InputNumber
+                size="small"
+                value={building.params[key] ?? 1}
+                min={0.01}
+                max={100}
+                step={0.1}
+                onChange={(v) => handleParamChange(key, v)}
+                style={{ width: 70 }}
+              />
+            </div>
+          ) : (
+            <InputNumber
+              size="small"
+              value={building.params[key]}
+              min={1}
+              onChange={(v) => handleParamChange(key, v)}
+              style={{ width: '100%' }}
+            />
+          )}
         </div>
       ))}
 
@@ -72,15 +116,17 @@ export function BuildingEditor({ editingId }: Props) {
         />
       </div>
 
-      {/* Color */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>颜色</div>
-        <ColorPicker
-          value={building.color}
-          onChange={handleColorChange}
-          size="small"
-        />
-      </div>
+      {/* Color (hide for GLB since it uses its own materials) */}
+      {!isGlb && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>颜色</div>
+          <ColorPicker
+            value={building.color}
+            onChange={handleColorChange}
+            size="small"
+          />
+        </div>
+      )}
 
       {/* Delete */}
       <Button

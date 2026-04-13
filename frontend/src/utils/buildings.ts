@@ -102,6 +102,12 @@ export const BUILDING_PRESETS: Record<BuildingType, BuildingPreset> = {
     defaultParams: { levels: 3 },
     paramLabels: { levels: '层数' },
   },
+  glb: {
+    label: 'GLB 模型',
+    icon: 'FileOutlined',
+    defaultParams: { scale: 1 },
+    paramLabels: { scale: '缩放' },
+  },
 }
 
 const COLORS = [

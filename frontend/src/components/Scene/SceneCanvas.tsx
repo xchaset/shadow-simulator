@@ -31,6 +31,8 @@ interface ClipboardBuilding {
   color: string
   name: string
   position: [number, number]
+  glbUrl?: string
+  glbScale?: number
 }
 
 export function SceneCanvas() {
@@ -55,6 +57,8 @@ export function SceneCanvas() {
         color: building.color,
         name: building.name,
         position: [...building.position],
+        glbUrl: building.glbUrl,
+        glbScale: building.glbScale,
       }
       return
     }
@@ -72,6 +76,8 @@ export function SceneCanvas() {
         position: [clip.position[0] + PASTE_OFFSET, clip.position[1] + PASTE_OFFSET],
         rotation: clip.rotation,
         color: clip.color,
+        glbUrl: clip.glbUrl,
+        glbScale: clip.glbScale,
       }
       addBuilding(newBuilding)
       // 选中新建筑，并更新剪贴板位置使连续粘贴不重叠
