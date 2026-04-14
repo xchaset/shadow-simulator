@@ -49,9 +49,12 @@ export function ProjectSidebar() {
   const loadRecentModels = useCallback(async () => {
     setRecentLoading(true)
     try {
+      console.log('[recent] loading...')
       const list = await recentModelApi.list(20)
+      console.log('[recent] loaded:', list.length, list.map(m => m.name))
       setRecentModels(list)
-    } catch {
+    } catch (e) {
+      console.error('[recent] error:', e)
       setRecentModels([])
     } finally {
       setRecentLoading(false)
