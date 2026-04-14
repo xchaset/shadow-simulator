@@ -52,7 +52,6 @@ export function SceneCanvas() {
   const terrainRef = useRef<any>(null)
 
   const handleTerrainHeightChange = useCallback(() => {
-    // 地形变化时标记 dirty
     useStore.getState().setDirty(true)
   }, [])
 
@@ -180,7 +179,6 @@ export function SceneCanvas() {
         <Ground
           onClick={terrainEditor.enabled ? undefined : () => clearSelection()}
           terrainRef={terrainRef}
-          onTerrainHeightChange={handleTerrainHeightChange}
         />
         <BuildingGroup />
         <SelectionBox start={boxSelectStart} end={boxSelectEnd} />
@@ -188,7 +186,7 @@ export function SceneCanvas() {
         <Compass />
         <SunIndicator />
         <CameraControls />
-        {terrainEditor.enabled && <TerrainEditor onHeightChange={handleTerrainHeightChange} />}
+        {terrainEditor.enabled && <TerrainEditor geometryRef={terrainRef} onHeightChange={handleTerrainHeightChange} />}
       </Canvas>
     </div>
   )

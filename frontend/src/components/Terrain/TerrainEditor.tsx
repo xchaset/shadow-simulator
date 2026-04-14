@@ -1,39 +1,35 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
-import { Plane, Vector3, PlaneGeometry } from 'three'
+import { Plane, Vector3 } from 'three'
 import { useStore } from '../../store/useStore'
 
-const TERRAIN_RESOLUTION = 128
-const TERRAIN_MAX_HEIGHT = 50
-
 interface TerrainEditorProps {
+  geometryRef: React.RefObject<any>
   onHeightChange: () => void
 }
 
 /**
- * 地形编辑器 - 核心组件
- * 负责监听鼠标事件并修改地面几何体的顶点高度
+ * 地形编辑器 - 处理鼠标交互和顶点编辑
+ * 不自带 mesh，通过 geometryRef 操作 Ground 中的几何体
  */
-export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
+export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProps) {
   const { camera, gl } = useThree()
-  const geometryRef = useRef<PlaneGeometry>(null)
   const isDrawingRef = useRef(false)
   const lastPosRef = useRef<[number, number] | null>(null)
 
   const terrainEditor = useStore(s => s.terrainEditor)
   const setTerrainEditor = useStore(s => s.setTerrainEditor)
-  const pushTerrainUndo = useStore(s => s.pushTerrainUndo)
   const terrainData = useStore(s => s.terrainData)
   const canvasSize = useStore(s => s.canvasSize)
 
   // 初始化地形数据
   useEffect(() => {
     if (!terrainData) {
-      const count = TERRAIN_RESOLUTION * TERRAIN_RESOLUTION
+      const count = 128 * 128
       useStore.getState().setTerrainData({
-        resolution: TERRAIN_RESOLUTION,
+        resolution: 128,
         heights: new Float32Array(count),
-        maxHeight: TERRAIN_MAX_HEIGHT,
+        maxHeight: 50,
       })
     }
   }, [])
@@ -43,19 +39,19 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     const halfSize = canvasSize / 2
     const u = (wx + halfSize) / canvasSize
     const v = (wz + halfSize) / canvasSize
-    const x = Math.floor(u * (TERRAIN_RESOLUTION - 1))
-    const y = Math.floor(v * (TERRAIN_RESOLUTION - 1))
-    return [Math.max(0, Math.min(TERRAIN_RESOLUTION - 1, x)), Math.max(0, Math.min(TERRAIN_RESOLUTION - 1, y))]
+    const x = Math.floor(u * 127)
+    const y = Math.floor(v * 127)
+    return [Math.max(0, Math.min(127, x)), Math.max(0, Math.min(127, y))]
   }, [canvasSize])
 
-  // 应用笔刷到高度图
+  // 应用笔刷
   const applyBrush = useCallback((worldX: number, worldZ: number, isFirst: boolean) => {
     const data = useStore.getState().terrainData
     if (!data) return
 
     const { brushMode, brushRadius, brushStrength } = useStore.getState().terrainEditor
     const [cx, cy] = worldToIndex(worldX, worldZ)
-    const radiusInIndices = Math.ceil((brushRadius / canvasSize) * TERRAIN_RESOLUTION)
+    const radiusInIndices = Math.ceil((brushRadius / canvasSize) * 128)
 
     if (isFirst) {
       useStore.getState().pushTerrainUndo()
@@ -73,7 +69,6 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
         const dist = Math.sqrt(dx * dx + dy * dy)
         if (dist > radiusInIndices) continue
 
-        // 高斯衰减
         const falloff = Math.exp(-(dist * dist) / (2 * (radiusInIndices * 0.5) ** 2))
         const idx = iy * resolution + ix
         const currentHeight = heights[idx]
@@ -86,7 +81,6 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
             heights[idx] = Math.max(-data.maxHeight, currentHeight - brushStrength * falloff)
             break
           case 'smooth': {
-            // 取周围高度的平均值
             let sum = 0
             let count = 0
             for (let sy = -1; sy <= 1; sy++) {
@@ -104,7 +98,6 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
             break
           }
           case 'flatten': {
-            // 平滑过渡到笔刷中心高度
             const centerIdx = cy * resolution + cx
             const targetHeight = heights[centerIdx]
             heights[idx] = currentHeight + (targetHeight - currentHeight) * brushStrength * 0.1 * falloff
@@ -114,16 +107,13 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
       }
     }
 
-    // 更新几何体
+    // 更新几何体顶点
     const geometry = geometryRef.current
     if (geometry) {
       const pos = geometry.attributes.position
       for (let i = 0; i < resolution; i++) {
         for (let j = 0; j < resolution; j++) {
-          const idx = i * resolution + j
-          // planeGeometry 的顶点是 XY 平面，需要映射
-          const vertexIdx = i * resolution + j
-          pos.setZ(vertexIdx, heights[idx])
+          pos.setZ(i * resolution + j, heights[i * resolution + j])
         }
       }
       pos.needsUpdate = true
@@ -131,9 +121,9 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     }
 
     onHeightChange()
-  }, [canvasSize, worldToIndex, onHeightChange])
+  }, [canvasSize, worldToIndex, geometryRef, onHeightChange])
 
-  // 射线检测获取世界坐标
+  // 射线检测
   const getWorldPosition = useCallback((event: PointerEvent): [number, number] | null => {
     const rect = gl.domElement.getBoundingClientRect()
     const mouse = {
@@ -145,18 +135,13 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     const currentCamera = useThree.getState().camera
     raycaster.setFromCamera(mouse, currentCamera)
 
-    const plane = new Plane(new Vector3(0, 1, 0), 0)
+    const groundPlane = new Plane(new Vector3(0, 1, 0), 0)
     const hit = new Vector3()
+    raycaster.ray.intersectPlane(groundPlane, hit)
 
-    raycaster.ray.intersectPlane(plane, hit)
+    return hit ? [hit.x, hit.z] : null
+  }, [gl])
 
-    if (hit) {
-      return [hit.x, hit.z]
-    }
-    return null
-  }, [])
-
-  // 鼠标事件处理
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!terrainEditor.enabled || e.button !== 0) return
     e.preventDefault()
@@ -176,7 +161,6 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
 
     if (!isDrawingRef.current || !pos) return
 
-    // 在两点之间插值，避免快速移动时出现空隙
     if (lastPosRef.current) {
       const [lx, lz] = lastPosRef.current
       const [nx, nz] = pos
@@ -243,23 +227,5 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     }
   })
 
-  return (
-    <>
-      {/* 笔刷指示器 */}
-      <div
-        id="terrain-brush-indicator"
-        style={{
-          position: 'fixed',
-          border: '2px solid rgba(255, 255, 255, 0.8)',
-          borderRadius: '50%',
-          pointerEvents: 'none',
-          zIndex: 1000,
-          display: 'none',
-          boxShadow: '0 0 4px rgba(0, 0, 0, 0.5)',
-        }}
-      />
-      {/* 隐藏的地面几何体引用 */}
-      <planeGeometry ref={geometryRef} args={[canvasSize, canvasSize, TERRAIN_RESOLUTION - 1, TERRAIN_RESOLUTION - 1]} />
-    </>
-  )
+  return null
 }
