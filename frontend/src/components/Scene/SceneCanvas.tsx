@@ -14,6 +14,8 @@ import { TerrainEditor } from '../Terrain/TerrainEditor'
 import { TerrainToolbar } from '../Terrain/TerrainToolbar'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
+import { modelApi } from '../../utils/api'
+import { loadState, removeModelFromRecent } from '../../utils/storage'
 import type { Building } from '../../types'
 
 /** 方向键每次移动的距离（米） */
@@ -161,6 +163,42 @@ export function SceneCanvas() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
+
+  // 自动加载上次打开的模型
+  useEffect(() => {
+    const { lastModelId } = loadState()
+    if (!lastModelId) return
+
+    let cancelled = false
+    modelApi.get(lastModelId).then(model => {
+      if (cancelled) return
+      const state = useStore.getState()
+
+      state.setBuildings(model.scene_data || [])
+      state.setLocation({ lat: model.location_lat, lng: model.location_lng, cityName: model.city_name })
+      if (model.date_time) state.setDateTime(new Date(model.date_time))
+      if (model.canvas_size !== undefined) state.setCanvasSize(model.canvas_size)
+      if (model.show_grid !== undefined) state.setShowGrid(model.show_grid)
+      if (model.grid_divisions !== undefined) state.setGridDivisions(model.grid_divisions)
+
+      if (model.terrain_data) {
+        state.setTerrainData({
+          ...model.terrain_data,
+          heights: new Float32Array(model.terrain_data.heights),
+        })
+      } else {
+        state.setTerrainData(null)
+      }
+
+      state.setCurrentModelId(model.id)
+      state.setCurrentDirectoryId(model.directory_id)
+      state.setDirty(false)
+    }).catch(() => {
+      removeModelFromRecent(lastModelId)
+    })
+
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div ref={containerRef} style={{ flex: 1, position: 'relative' }} tabIndex={-1}>

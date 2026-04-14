@@ -12,6 +12,7 @@ import {
 import type { TreeDataNode } from 'antd'
 import { useStore } from '../../store/useStore'
 import { directoryApi, modelApi } from '../../utils/api'
+import { recordModelOpen, removeModelFromRecent, loadState } from '../../utils/storage'
 import type { Directory, Model } from '../../types'
 
 export function ProjectSidebar() {
@@ -28,6 +29,7 @@ export function ProjectSidebar() {
   const [loading, setLoading] = useState(true)
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
   const [collapsed, setCollapsed] = useState(false)
+  const [activeTab, setActiveTab] = useState<'tree' | 'recent'>('tree')
 
   // Rename state
   const [renaming, setRenaming] = useState<{ type: 'dir' | 'model'; id: string } | null>(null)
@@ -38,6 +40,36 @@ export function ProjectSidebar() {
   // Move modal state
   const [moveModal, setMoveModal] = useState<{ type: 'model'; id: string; currentDirId: string } | null>(null)
   const [moveTargetDirId, setMoveTargetDirId] = useState<string | null>(null)
+
+  // Recent models
+  const [recentModels, setRecentModels] = useState<{ id: string; name: string; updatedAt: string }[]>([])
+  const [recentLoading, setRecentLoading] = useState(true)
+
+  // 加载最近打开的模型详情
+  const loadRecentModels = useCallback(async () => {
+    const { recentModels: recent } = loadState()
+    if (recent.length === 0) {
+      setRecentLoading(false)
+      return
+    }
+    setRecentLoading(true)
+    try {
+      const details = await Promise.all(
+        recent.map(async (r) => {
+          try {
+            return await modelApi.get(r.id)
+          } catch {
+            return null
+          }
+        })
+      )
+      setRecentModels(details.filter(Boolean) as Model[])
+    } catch {
+      // ignore
+    } finally {
+      setRecentLoading(false)
+    }
+  }, [])
 
   // ─── Data fetching ──────────────────────────────────────
 
@@ -63,6 +95,10 @@ export function ProjectSidebar() {
     fetchDirectories()
   }, [fetchDirectories])
 
+  useEffect(() => {
+    loadRecentModels()
+  }, [loadRecentModels])
+
   // ─── Load scene from model ─────────────────────────────
 
   const loadSceneFromModel = useCallback((model: Model) => {
@@ -75,11 +111,9 @@ export function ProjectSidebar() {
     if (model.date_time) {
       setDateTime(new Date(model.date_time))
     }
-    // 加载画布设置（如果模型中有保存的话）
     if (model.canvas_size !== undefined) setCanvasSize(model.canvas_size)
     if (model.show_grid !== undefined) setShowGrid(model.show_grid)
     if (model.grid_divisions !== undefined) setGridDivisions(model.grid_divisions)
-    // 加载地貌数据
     if (model.terrain_data) {
       setTerrainData({
         ...model.terrain_data,
@@ -91,6 +125,7 @@ export function ProjectSidebar() {
     setCurrentModelId(model.id)
     setCurrentDirectoryId(model.directory_id)
     setDirty(false)
+    recordModelOpen(model.id, model.name, model.updated_at)
   }, [setBuildings, setLocation, setDateTime, setCanvasSize, setShowGrid, setGridDivisions, setTerrainData, setCurrentModelId, setCurrentDirectoryId, setDirty])
 
   // ─── Directory operations ───────────────────────────────
@@ -248,6 +283,7 @@ export function ProjectSidebar() {
       onOk: async () => {
         try {
           await modelApi.delete(model.id)
+          removeModelFromRecent(model.id)
           if (currentModelId === model.id) {
             setCurrentModelId(null)
             setCurrentDirectoryId(null)
@@ -498,64 +534,130 @@ export function ProjectSidebar() {
     }}>
       {/* Header */}
       <div style={{
-        padding: '8px 8px 8px 12px', fontWeight: 600, fontSize: 13,
         borderBottom: '1px solid #e8e8e8',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FolderOutlined /> 项目
-        </span>
-        <div style={{ display: 'flex', gap: 2 }}>
-          {dirty && currentModelId && (
-            <Tooltip title="保存 (Ctrl+S)">
-              <Button type="text" size="small" icon={<SaveOutlined />}
-                style={{ color: '#faad14' }} onClick={handleSave} />
-            </Tooltip>
-          )}
-          <Tooltip title="新建目录">
-            <Button type="text" size="small" icon={<FolderAddOutlined />}
-              onClick={handleCreateDirectory} />
-          </Tooltip>
-          <Button type="text" size="small"
-            onClick={() => setCollapsed(true)}
-            style={{ fontSize: 16, lineHeight: 1 }}>
-            ‹
-          </Button>
+        {/* Tab bar */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8' }}>
+          {(['tree', 'recent'] as const).map(tab => (
+            <div
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                flex: 1, textAlign: 'center', padding: '8px 0',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                color: activeTab === tab ? '#1677ff' : '#999',
+                borderBottom: activeTab === tab ? '2px solid #1677ff' : '2px solid transparent',
+                marginBottom: -1,
+              }}
+            >
+              {tab === 'tree' ? '项目' : '最近打开'}
+            </div>
+          ))}
         </div>
+        {/* Actions bar (only show for tree tab) */}
+        {activeTab === 'tree' && (
+          <div style={{
+            padding: '6px 8px 6px 12px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 12, color: '#666' }}>
+              <FolderOutlined style={{ marginRight: 4 }} />{directories.length} 个目录
+            </span>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {dirty && currentModelId && (
+                <Tooltip title="保存 (Ctrl+S)">
+                  <Button type="text" size="small" icon={<SaveOutlined />}
+                    style={{ color: '#faad14' }} onClick={handleSave} />
+                </Tooltip>
+              )}
+              <Tooltip title="新建目录">
+                <Button type="text" size="small" icon={<FolderAddOutlined />}
+                  onClick={handleCreateDirectory} />
+              </Tooltip>
+              <Button type="text" size="small"
+                onClick={() => setCollapsed(true)}
+                style={{ fontSize: 16, lineHeight: 1 }}>
+                ‹
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Tree */}
+      {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}><Spin size="small" /></div>
-        ) : directories.length === 0 ? (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="暂无项目"
-            style={{ padding: '40px 0' }}
-          >
-            <Button type="primary" size="small" icon={<FolderAddOutlined />}
-              onClick={handleCreateDirectory}>
-              新建目录
-            </Button>
-          </Empty>
+        {activeTab === 'tree' ? (
+          loading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin size="small" /></div>
+          ) : directories.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="暂无项目"
+              style={{ padding: '40px 0' }}
+            >
+              <Button type="primary" size="small" icon={<FolderAddOutlined />}
+                onClick={handleCreateDirectory}>
+                新建目录
+              </Button>
+            </Empty>
+          ) : (
+            <Tree
+              treeData={treeData}
+              expandedKeys={expandedKeys}
+              onExpand={(keys) => setExpandedKeys(keys as string[])}
+              onSelect={(keys) => {
+                const key = keys[0] as string
+                if (!key) return
+                if (key.startsWith('model-')) {
+                  handleSelectModel(key.replace('model-', ''))
+                }
+              }}
+              selectedKeys={currentModelId ? [`model-${currentModelId}`] : []}
+              showIcon={false}
+              blockNode
+              style={{ background: 'transparent' }}
+            />
+          )
         ) : (
-          <Tree
-            treeData={treeData}
-            expandedKeys={expandedKeys}
-            onExpand={(keys) => setExpandedKeys(keys as string[])}
-            onSelect={(keys) => {
-              const key = keys[0] as string
-              if (!key) return
-              if (key.startsWith('model-')) {
-                handleSelectModel(key.replace('model-', ''))
-              }
-            }}
-            selectedKeys={currentModelId ? [`model-${currentModelId}`] : []}
-            showIcon={false}
-            blockNode
-            style={{ background: 'transparent' }}
-          />
+          // Recent models tab
+          recentLoading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin size="small" /></div>
+          ) : recentModels.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无最近打开的模型" style={{ padding: '40px 0' }} />
+          ) : (
+            <div style={{ padding: '0 8px' }}>
+              {recentModels.map(model => (
+                <div
+                  key={model.id}
+                  onClick={() => handleSelectModel(model.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                    background: currentModelId === model.id ? '#e6f4ff' : 'transparent',
+                    marginBottom: 2,
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (currentModelId !== model.id) (e.currentTarget.style.background = '#f0f0f0') }}
+                  onMouseLeave={e => { if (currentModelId !== model.id) (e.currentTarget.style.background = 'transparent') }}
+                >
+                  <FileOutlined style={{ color: currentModelId === model.id ? '#1677ff' : '#8c8c8c' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13, fontWeight: currentModelId === model.id ? 600 : 400,
+                      color: currentModelId === model.id ? '#1677ff' : '#333',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {model.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                      {model.building_count || 0} 栋建筑 · {new Date(model.updated_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {currentModelId === model.id && <span style={{ fontSize: 10, color: '#1677ff' }}>当前</span>}
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 
