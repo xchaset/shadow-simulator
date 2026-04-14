@@ -36,6 +36,10 @@ export const createModel: ValidationSchema = {
       min: 10,
       max: 500,
     },
+    terrain_data: {
+      type: 'object',
+      required: false,
+    },
   },
 }
 
@@ -107,6 +111,10 @@ export const updateModel: ValidationSchema = {
       required: false,
       min: 10,
       max: 500,
+    },
+    terrain_data: {
+      type: 'object',
+      required: false,
     },
   },
 }

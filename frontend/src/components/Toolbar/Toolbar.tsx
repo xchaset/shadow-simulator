@@ -4,13 +4,21 @@ import { GlbImporter } from './GlbImporter'
 import { CitySelector } from './CitySelector'
 import { SunInfoPanel } from '../SunInfo/SunInfoPanel'
 import { Button } from 'antd'
-import { AimOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { AimOutlined, AppstoreOutlined, EnvironmentOutlined } from '@ant-design/icons'
+import { useStore } from '../../store/useStore'
 
 interface ToolbarProps {
   onOpenMap?: () => void
 }
 
 export function Toolbar({ onOpenMap }: ToolbarProps) {
+  const terrainEditor = useStore(s => s.terrainEditor)
+  const setTerrainEditor = useStore(s => s.setTerrainEditor)
+
+  const toggleTerrain = () => {
+    setTerrainEditor({ enabled: !terrainEditor.enabled })
+  }
+
   return (
     <div style={{
       height: 48,
@@ -41,6 +49,15 @@ export function Toolbar({ onOpenMap }: ToolbarProps) {
       <BuildingTools />
       <BuildingImporter />
       <GlbImporter />
+      <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
+      <Button
+        size="small"
+        type={terrainEditor.enabled ? 'primary' : 'default'}
+        icon={<EnvironmentOutlined />}
+        onClick={toggleTerrain}
+      >
+        地貌
+      </Button>
       <div style={{ flex: 1 }} />
       <SunInfoPanel />
     </div>

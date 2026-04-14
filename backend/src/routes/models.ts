@@ -26,6 +26,16 @@ function parseRow(row: any) {
   if (typeof row.scene_data === 'string') {
     try { row.scene_data = JSON.parse(row.scene_data) } catch { row.scene_data = [] }
   }
+  if (typeof row.terrain_data === 'string') {
+    try {
+      const parsed = JSON.parse(row.terrain_data)
+      // 将 heights 转换为 Float32Array
+      if (parsed && parsed.heights) {
+        parsed.heights = new Float32Array(parsed.heights)
+      }
+      row.terrain_data = parsed
+    } catch { row.terrain_data = null }
+  }
   return row
 }
 
@@ -40,6 +50,7 @@ router.get('/directories/:dirId/models', validate(schema.listModels), (req, res)
     WHERE directory_id = ?
     ORDER BY sort_order ASC, created_at ASC
   `).all(dirId)
+  // 列表接口不返回 terrain_data（数据量大），需要时由 get 接口获取
   res.json(rows)
 })
 
@@ -53,21 +64,30 @@ router.post('/directories/:dirId/models', validate(schema.createModel), (req, re
   const {
     name, description, location_lat, location_lng,
     city_name, date_time, scene_data, sort_order,
-    canvas_size, show_grid, grid_divisions,
+    canvas_size, show_grid, grid_divisions, terrain_data,
   } = req.body
 
   const { str: sceneStr, count: buildingCount } = normalizeSceneData(scene_data)
   const id = uuidv4()
   const dt = date_time || new Date().toISOString()
 
+  // 序列化 terrain_data
+  let terrainStr = null
+  if (terrain_data && terrain_data.heights) {
+    terrainStr = JSON.stringify({
+      ...terrain_data,
+      heights: Array.from(terrain_data.heights),
+    })
+  }
+
   db.prepare(`
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
                         city_name, date_time, building_count, scene_data, sort_order,
-                        canvas_size, show_grid, grid_divisions)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        canvas_size, show_grid, grid_divisions, terrain_data)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, dirId, name, description, location_lat, location_lng,
          city_name, dt, buildingCount, sceneStr, sort_order,
-         canvas_size ?? 2000, show_grid !== undefined ? (show_grid ? 1 : 0) : 1, grid_divisions ?? 200)
+         canvas_size ?? 2000, show_grid !== undefined ? (show_grid ? 1 : 0) : 1, grid_divisions ?? 200, terrainStr)
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
   res.status(201).json(parseRow(row))
@@ -89,7 +109,7 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
 
   const { name, description, location_lat, location_lng, city_name,
           date_time, scene_data, sort_order,
-          canvas_size, show_grid, grid_divisions } = req.body
+          canvas_size, show_grid, grid_divisions, terrain_data } = req.body
 
   const updates: string[] = []
   const values: any[] = []
@@ -109,6 +129,17 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
     const { str, count } = normalizeSceneData(scene_data)
     updates.push('scene_data = ?'); values.push(str)
     updates.push('building_count = ?'); values.push(count)
+  }
+
+  if (terrain_data !== undefined) {
+    let terrainStr = null
+    if (terrain_data && terrain_data.heights) {
+      terrainStr = JSON.stringify({
+        ...terrain_data,
+        heights: Array.from(terrain_data.heights),
+      })
+    }
+    updates.push('terrain_data = ?'); values.push(terrainStr)
   }
 
   if (updates.length === 0) {
@@ -139,12 +170,12 @@ router.post('/models/:id/copy', validate(schema.getModel), (req, res) => {
   db.prepare(`
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
                         city_name, date_time, building_count, scene_data, sort_order,
-                        canvas_size, show_grid, grid_divisions)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        canvas_size, show_grid, grid_divisions, terrain_data)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(newId, targetDirId, newName, existing.description, existing.location_lat,
          existing.location_lng, existing.city_name, existing.date_time,
          existing.building_count, existing.scene_data, existing.sort_order,
-         existing.canvas_size, existing.show_grid, existing.grid_divisions)
+         existing.canvas_size, existing.show_grid, existing.grid_divisions, existing.terrain_data)
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(newId)
   res.status(201).json(parseRow(row))

@@ -10,6 +10,8 @@ import { BuildingGroup } from '../Buildings/BuildingGroup'
 import { SelectionBox } from '../Selection/SelectionBox'
 import { BoxSelectInteraction } from '../Selection/BoxSelectInteraction'
 import { CanvasSettings } from './CanvasSettings'
+import { TerrainEditor } from '../Terrain/TerrainEditor'
+import { TerrainToolbar } from '../Terrain/TerrainToolbar'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
 import type { Building } from '../../types'
@@ -43,8 +45,21 @@ export function SceneCanvas() {
   const addBuilding = useStore(s => s.addBuilding)
   const boxSelectStart = useStore(s => s.boxSelectStart)
   const boxSelectEnd = useStore(s => s.boxSelectEnd)
+  const terrainEditor = useStore(s => s.terrainEditor)
+  const setTerrainData = useStore(s => s.setTerrainData)
   const containerRef = useRef<HTMLDivElement>(null)
   const clipboardRef = useRef<ClipboardBuilding[] | null>(null)
+  const terrainRef = useRef<any>(null)
+
+  const handleTerrainHeightChange = useCallback(() => {
+    // 地形变化时标记 dirty
+    useStore.getState().setDirty(true)
+  }, [])
+
+  const handleTerrainReset = useCallback(() => {
+    setTerrainData(null)
+    handleTerrainHeightChange()
+  }, [setTerrainData, handleTerrainHeightChange])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const { selectedBuildingId, selectedBuildingIds, buildings, updateBuilding } = useStore.getState()
@@ -152,19 +167,28 @@ export function SceneCanvas() {
     <div ref={containerRef} style={{ flex: 1, position: 'relative' }} tabIndex={-1}>
       <FloatingEditor />
       <CanvasSettings />
+
+      {/* 地形工具栏 */}
+      {terrainEditor.enabled && <TerrainToolbar onReset={handleTerrainReset} />}
+
       <Canvas
         shadows
         camera={{ position: [0, 100, -130], fov: 50, near: 0.1, far: 3000 }}
       >
         <SkyBackground />
         <SunLight />
-        <Ground onClick={() => clearSelection()} />
+        <Ground
+          onClick={terrainEditor.enabled ? undefined : () => clearSelection()}
+          terrainRef={terrainRef}
+          onTerrainHeightChange={handleTerrainHeightChange}
+        />
         <BuildingGroup />
         <SelectionBox start={boxSelectStart} end={boxSelectEnd} />
         <BoxSelectInteraction />
         <Compass />
         <SunIndicator />
         <CameraControls />
+        {terrainEditor.enabled && <TerrainEditor onHeightChange={handleTerrainHeightChange} />}
       </Canvas>
     </div>
   )

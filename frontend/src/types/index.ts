@@ -47,6 +47,38 @@ export interface PlaybackState {
   speed: number
 }
 
+// ─── Terrain Types ────────────────────────────────────────
+
+export type TerrainBrushMode = 'raise' | 'lower' | 'smooth' | 'flatten'
+
+export interface TerrainData {
+  /** 高度图分辨率（如 64, 128, 256） */
+  resolution: number
+  /** 高度数据，一维数组按行存储 [row * resolution + col] */
+  heights: Float32Array | number[]
+  /** 最大高度（米） */
+  maxHeight: number
+}
+
+export interface TerrainEditorState {
+  /** 是否处于地形编辑模式 */
+  enabled: boolean
+  /** 笔刷模式 */
+  brushMode: TerrainBrushMode
+  /** 笔刷半径（世界单位） */
+  brushRadius: number
+  /** 笔刷强度 */
+  brushStrength: number
+  /** 笔刷位置（世界坐标） */
+  brushPosition: [number, number] | null
+  /** 是否正在绘制 */
+  isDrawing: boolean
+  /** 撤销栈 */
+  undoStack: TerrainData[]
+  /** 重做栈 */
+  redoStack: TerrainData[]
+}
+
 // ─── Project Types ────────────────────────────────────────
 
 export interface Directory {
@@ -70,6 +102,8 @@ export interface Model {
   date_time: string
   building_count: number
   scene_data?: Building[]
+  /** 地貌数据 */
+  terrain_data?: TerrainData
   // 画布设置（与模型绑定）
   canvas_size?: number  // 画布尺寸（默认 2000）
   show_grid?: boolean  // 是否显示网格（默认 true）
@@ -133,4 +167,13 @@ export interface AppState {
   setCurrentModelId: (id: string | null) => void
   dirty: boolean
   setDirty: (v: boolean) => void
+
+  // Terrain
+  terrainData: TerrainData | null
+  setTerrainData: (data: TerrainData | null) => void
+  terrainEditor: TerrainEditorState
+  setTerrainEditor: (updates: Partial<TerrainEditorState>) => void
+  pushTerrainUndo: () => void
+  terrainUndo: () => void
+  terrainRedo: () => void
 }

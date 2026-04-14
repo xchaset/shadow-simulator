@@ -1,7 +1,9 @@
 import { create } from 'zustand'
-import type { AppState, Building, Directory, Location, Model, PlaybackState } from '../types'
+import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode } from '../types'
 
-export const useStore = create<AppState>((set) => ({
+const MAX_UNDO = 20
+
+export const useStore = create<AppState>((set, get) => ({
   // ─── Scene State ────────────────────────────────────────
 
   location: { lat: 39.9042, lng: 116.4074, cityName: '北京' },
@@ -115,4 +117,85 @@ export const useStore = create<AppState>((set) => ({
 
   dirty: false,
   setDirty: (v: boolean) => set({ dirty: v }),
+
+  // ─── Terrain State ──────────────────────────────────────
+
+  terrainData: null,
+  setTerrainData: (data: TerrainData | null) => set({ terrainData: data, dirty: true }),
+
+  terrainEditor: {
+    enabled: false,
+    brushMode: 'raise',
+    brushRadius: 50,
+    brushStrength: 5,
+    brushPosition: null,
+    isDrawing: false,
+    undoStack: [],
+    redoStack: [],
+  } as TerrainEditorState,
+
+  setTerrainEditor: (updates: Partial<TerrainEditorState>) =>
+    set(state => ({
+      terrainEditor: { ...state.terrainEditor, ...updates },
+    })),
+
+  /** 将当前地形推入撤销栈 */
+  pushTerrainUndo: () => {
+    const { terrainData, terrainEditor } = get()
+    if (!terrainData) return
+    const snapshot: TerrainData = {
+      resolution: terrainData.resolution,
+      heights: new Float32Array(terrainData.heights),
+      maxHeight: terrainData.maxHeight,
+    }
+    set({
+      terrainEditor: {
+        ...terrainEditor,
+        undoStack: [...terrainEditor.undoStack.slice(-MAX_UNDO + 1), snapshot],
+        redoStack: [],
+      },
+    })
+  },
+
+  /** 撤销 */
+  terrainUndo: () => {
+    const { terrainEditor, terrainData } = get()
+    if (terrainEditor.undoStack.length === 0) return
+    const last = terrainEditor.undoStack[terrainEditor.undoStack.length - 1]
+    const currentSnapshot = terrainData ? {
+      resolution: terrainData.resolution,
+      heights: new Float32Array(terrainData.heights),
+      maxHeight: terrainData.maxHeight,
+    } : null
+    set({
+      terrainData: last,
+      terrainEditor: {
+        ...terrainEditor,
+        undoStack: terrainEditor.undoStack.slice(0, -1),
+        redoStack: currentSnapshot ? [...terrainEditor.redoStack, currentSnapshot] : terrainEditor.redoStack,
+      },
+      dirty: true,
+    })
+  },
+
+  /** 重做 */
+  terrainRedo: () => {
+    const { terrainEditor, terrainData } = get()
+    if (terrainEditor.redoStack.length === 0) return
+    const next = terrainEditor.redoStack[terrainEditor.redoStack.length - 1]
+    const currentSnapshot = terrainData ? {
+      resolution: terrainData.resolution,
+      heights: new Float32Array(terrainData.heights),
+      maxHeight: terrainData.maxHeight,
+    } : null
+    set({
+      terrainData: next,
+      terrainEditor: {
+        ...terrainEditor,
+        redoStack: terrainEditor.redoStack.slice(0, -1),
+        undoStack: currentSnapshot ? [...terrainEditor.undoStack, currentSnapshot] : terrainEditor.undoStack,
+      },
+      dirty: true,
+    })
+  },
 }))

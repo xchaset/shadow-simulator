@@ -21,7 +21,7 @@ export function ProjectSidebar() {
     setBuildings, setLocation, setDateTime,
     setCurrentModelId, setCurrentDirectoryId,
     setDirty, setDirectories, directories,
-    setCanvasSize, setShowGrid, setGridDivisions,
+    setCanvasSize, setShowGrid, setGridDivisions, setTerrainData,
   } = useStore()
 
   const [models, setModels] = useState<Record<string, Model[]>>({})
@@ -79,10 +79,19 @@ export function ProjectSidebar() {
     if (model.canvas_size !== undefined) setCanvasSize(model.canvas_size)
     if (model.show_grid !== undefined) setShowGrid(model.show_grid)
     if (model.grid_divisions !== undefined) setGridDivisions(model.grid_divisions)
+    // 加载地貌数据
+    if (model.terrain_data) {
+      setTerrainData({
+        ...model.terrain_data,
+        heights: new Float32Array(model.terrain_data.heights),
+      })
+    } else {
+      setTerrainData(null)
+    }
     setCurrentModelId(model.id)
     setCurrentDirectoryId(model.directory_id)
     setDirty(false)
-  }, [setBuildings, setLocation, setDateTime, setCanvasSize, setShowGrid, setGridDivisions, setCurrentModelId, setCurrentDirectoryId, setDirty])
+  }, [setBuildings, setLocation, setDateTime, setCanvasSize, setShowGrid, setGridDivisions, setTerrainData, setCurrentModelId, setCurrentDirectoryId, setDirty])
 
   // ─── Directory operations ───────────────────────────────
 
@@ -292,15 +301,21 @@ export function ProjectSidebar() {
       return
     }
     try {
+      const { terrainData, canvasSize, showGrid, gridDivisions } = useStore.getState()
       await modelApi.update(currentModelId, {
         scene_data: buildings,
         location_lat: location.lat,
         location_lng: location.lng,
         city_name: location.cityName,
         date_time: dateTime.toISOString(),
-        canvas_size: useStore.getState().canvasSize,
-        show_grid: useStore.getState().showGrid,
-        grid_divisions: useStore.getState().gridDivisions,
+        canvas_size: canvasSize,
+        show_grid: showGrid,
+        grid_divisions: gridDivisions,
+        terrain_data: terrainData ? {
+          resolution: terrainData.resolution,
+          heights: Array.from(terrainData.heights),
+          maxHeight: terrainData.maxHeight,
+        } : null,
       })
       setDirty(false)
       await fetchDirectories()

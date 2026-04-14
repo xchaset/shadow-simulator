@@ -72,4 +72,8 @@ if (!columnNames.includes('grid_divisions')) {
   db.exec(`ALTER TABLE models ADD COLUMN grid_divisions INTEGER NOT NULL DEFAULT 200`)
 }
 
+if (!columnNames.includes('terrain_data')) {
+  db.exec(`ALTER TABLE models ADD COLUMN terrain_data TEXT DEFAULT NULL`)
+}
+
 export default db
