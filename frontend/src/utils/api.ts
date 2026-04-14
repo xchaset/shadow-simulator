@@ -113,6 +113,10 @@ export interface UpdateModelParams {
   date_time?: string
   scene_data?: Building[]
   sort_order?: number
+  canvas_size?: number
+  show_grid?: boolean
+  grid_divisions?: number
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
 }
 
 export const modelApi = {

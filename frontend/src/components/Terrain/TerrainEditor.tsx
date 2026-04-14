@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
-import { PlaneGeometry } from 'three'
+import { Plane, Vector3, PlaneGeometry } from 'three'
 import { useStore } from '../../store/useStore'
 
 const TERRAIN_RESOLUTION = 128
@@ -58,7 +58,7 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     const radiusInIndices = Math.ceil((brushRadius / canvasSize) * TERRAIN_RESOLUTION)
 
     if (isFirst) {
-      pushTerrainUndo()
+      useStore.getState().pushTerrainUndo()
     }
 
     const heights = data.heights as Float32Array
@@ -131,7 +131,7 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     }
 
     onHeightChange()
-  }, [canvasSize, worldToIndex, pushTerrainUndo, onHeightChange])
+  }, [canvasSize, worldToIndex, onHeightChange])
 
   // 射线检测获取世界坐标
   const getWorldPosition = useCallback((event: PointerEvent): [number, number] | null => {
@@ -142,21 +142,19 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     }
 
     const raycaster = useThree.getState().raycaster
-    raycaster.setFromCamera(mouse, camera)
+    const currentCamera = useThree.getState().camera
+    raycaster.setFromCamera(mouse, currentCamera)
 
-    const plane = geometryRef.current
-    if (!plane) return null
+    const plane = new Plane(new Vector3(0, 1, 0), 0)
+    const hit = new Vector3()
 
-    const hit = raycaster.ray.intersectPlane(
-      new (require('three').Plane)(new (require('three').Vector3)(0, 1, 0), 0),
-      new (require('three').Vector3)()
-    )
+    raycaster.ray.intersectPlane(plane, hit)
 
     if (hit) {
       return [hit.x, hit.z]
     }
     return null
-  }, [camera, gl])
+  }, [])
 
   // 鼠标事件处理
   const handlePointerDown = useCallback((e: PointerEvent) => {
@@ -229,8 +227,7 @@ export function TerrainEditor({ onHeightChange }: TerrainEditorProps) {
     }
 
     if (brushIndicator) {
-      // 将世界坐标转换为屏幕坐标
-      const worldPos = new (require('three').Vector3)(brushPosition[0], 0, brushPosition[1])
+      const worldPos = new Vector3(brushPosition[0], 0, brushPosition[1])
       const screenPos = worldPos.project(camera)
       const rect = gl.domElement.getBoundingClientRect()
 
