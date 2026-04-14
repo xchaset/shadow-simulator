@@ -14,8 +14,8 @@ import { TerrainEditor } from '../Terrain/TerrainEditor'
 import { TerrainToolbar } from '../Terrain/TerrainToolbar'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
-import { modelApi } from '../../utils/api'
-import { loadState, removeModelFromRecent } from '../../utils/storage'
+import { modelApi, recentModelApi } from '../../utils/api'
+import { loadState, saveState } from '../../utils/storage'
 import type { Building } from '../../types'
 
 /** 方向键每次移动的距离（米） */
@@ -193,8 +193,11 @@ export function SceneCanvas() {
       state.setCurrentModelId(model.id)
       state.setCurrentDirectoryId(model.directory_id)
       state.setDirty(false)
+      // 记录打开
+      recentModelApi.record(model.id).catch(() => {})
+      saveState({ lastModelId: model.id })
     }).catch(() => {
-      removeModelFromRecent(lastModelId)
+      recentModelApi.remove(lastModelId).catch(() => {})
     })
 
     return () => { cancelled = true }

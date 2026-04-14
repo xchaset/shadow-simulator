@@ -153,3 +153,20 @@ export const modelApi = {
       body: JSON.stringify({ target_directory_id: targetDirectoryId }),
     }),
 }
+
+// ─── Recent Models API ────────────────────────────────────
+
+export interface RecentModelDTO extends ModelDTO {
+  opened_at: string
+}
+
+export const recentModelApi = {
+  list: (limit = 20) =>
+    request<RecentModelDTO[]>(`/recent-models?limit=${limit}`),
+
+  record: (modelId: string) =>
+    request<{ success: boolean }>(`/recent-models/${modelId}`, { method: 'POST' }),
+
+  remove: (modelId: string) =>
+    request<{ success: boolean }>(`/recent-models/${modelId}`, { method: 'DELETE' }),
+}

@@ -2,11 +2,10 @@ const STORAGE_KEY = 'shadow-simulator'
 
 export interface StorageState {
   lastModelId: string | null
-  recentModels: { id: string; name: string; updatedAt: string }[]
 }
 
 function getDefault(): StorageState {
-  return { lastModelId: null, recentModels: [] }
+  return { lastModelId: null }
 }
 
 export function loadState(): StorageState {
@@ -27,22 +26,4 @@ export function saveState(updates: Partial<StorageState>) {
   } catch {
     // ignore quota errors
   }
-}
-
-/** 记录模型打开历史 */
-export function recordModelOpen(id: string, name: string, updatedAt: string) {
-  const { recentModels } = loadState()
-  const filtered = recentModels.filter(m => m.id !== id)
-  filtered.unshift({ id, name, updatedAt })
-  saveState({ lastModelId: id, recentModels: filtered.slice(0, 20) })
-}
-
-/** 清除已删除模型的记录 */
-export function removeModelFromRecent(id: string) {
-  const { recentModels, lastModelId } = loadState()
-  const filtered = recentModels.filter(m => m.id !== id)
-  saveState({
-    recentModels: filtered,
-    lastModelId: lastModelId === id ? null : lastModelId,
-  })
 }

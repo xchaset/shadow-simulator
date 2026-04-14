@@ -76,4 +76,18 @@ if (!columnNames.includes('terrain_data')) {
   db.exec(`ALTER TABLE models ADD COLUMN terrain_data TEXT DEFAULT NULL`)
 }
 
+// ─── Migration: Add recent_models table ────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS recent_models (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_id   TEXT NOT NULL,
+    opened_at  TEXT DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_recent_models_model ON recent_models(model_id);
+  CREATE INDEX IF NOT EXISTS idx_recent_models_opened ON recent_models(opened_at DESC);
+`)
+
 export default db

@@ -209,4 +209,38 @@ router.delete('/models/:id', validate(schema.deleteModel), (req, res) => {
   res.json({ success: true })
 })
 
+// ─── POST /api/recent-models/:modelId ─────────────────────
+router.post('/recent-models/:modelId', validate(schema.getModel), (req, res) => {
+  const { modelId } = req.params
+  const existing = db.prepare('SELECT id FROM models WHERE id = ?').get(modelId)
+  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+
+  // 删除旧的记录，插入新的（保持每个模型只有一条最近记录）
+  db.prepare('DELETE FROM recent_models WHERE model_id = ?').run(modelId)
+  db.prepare('INSERT INTO recent_models (model_id) VALUES (?)').run(modelId)
+  res.json({ success: true })
+})
+
+// ─── GET /api/recent-models ───────────────────────────────
+router.get('/recent-models', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 20, 50)
+  const rows = db.prepare(`
+    SELECT m.id, m.directory_id, m.name, m.description, m.location_lat, m.location_lng,
+           m.city_name, m.date_time, m.building_count, m.canvas_size, m.show_grid, m.grid_divisions,
+           m.terrain_data, m.sort_order, m.created_at, m.updated_at, rm.opened_at
+    FROM recent_models rm
+    JOIN models m ON m.id = rm.model_id
+    ORDER BY rm.opened_at DESC
+    LIMIT ?
+  `).all(limit)
+  res.json(rows.map(parseRow))
+})
+
+// ─── DELETE /api/recent-models/:modelId ───────────────────
+router.delete('/recent-models/:modelId', validate(schema.getModel), (req, res) => {
+  const { modelId } = req.params
+  db.prepare('DELETE FROM recent_models WHERE model_id = ?').run(modelId)
+  res.json({ success: true })
+})
+
 export default router

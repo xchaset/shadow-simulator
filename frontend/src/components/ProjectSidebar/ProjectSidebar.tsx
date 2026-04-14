@@ -11,8 +11,8 @@ import {
 } from '@ant-design/icons'
 import type { TreeDataNode } from 'antd'
 import { useStore } from '../../store/useStore'
-import { directoryApi, modelApi } from '../../utils/api'
-import { recordModelOpen, removeModelFromRecent, loadState } from '../../utils/storage'
+import { directoryApi, modelApi, recentModelApi } from '../../utils/api'
+import { loadState, saveState } from '../../utils/storage'
 import type { Directory, Model } from '../../types'
 
 export function ProjectSidebar() {
@@ -42,30 +42,17 @@ export function ProjectSidebar() {
   const [moveTargetDirId, setMoveTargetDirId] = useState<string | null>(null)
 
   // Recent models
-  const [recentModels, setRecentModels] = useState<{ id: string; name: string; updatedAt: string }[]>([])
+  const [recentModels, setRecentModels] = useState<Model[]>([])
   const [recentLoading, setRecentLoading] = useState(true)
 
   // 加载最近打开的模型详情
   const loadRecentModels = useCallback(async () => {
-    const { recentModels: recent } = loadState()
-    if (recent.length === 0) {
-      setRecentLoading(false)
-      return
-    }
     setRecentLoading(true)
     try {
-      const details = await Promise.all(
-        recent.map(async (r) => {
-          try {
-            return await modelApi.get(r.id)
-          } catch {
-            return null
-          }
-        })
-      )
-      setRecentModels(details.filter(Boolean) as Model[])
+      const list = await recentModelApi.list(20)
+      setRecentModels(list)
     } catch {
-      // ignore
+      setRecentModels([])
     } finally {
       setRecentLoading(false)
     }
@@ -125,7 +112,10 @@ export function ProjectSidebar() {
     setCurrentModelId(model.id)
     setCurrentDirectoryId(model.directory_id)
     setDirty(false)
-    recordModelOpen(model.id, model.name, model.updated_at)
+    // 记录到后端最近打开
+    recentModelApi.record(model.id).catch(() => {})
+    // 本地记录 lastModelId
+    saveState({ lastModelId: model.id })
   }, [setBuildings, setLocation, setDateTime, setCanvasSize, setShowGrid, setGridDivisions, setTerrainData, setCurrentModelId, setCurrentDirectoryId, setDirty])
 
   // ─── Directory operations ───────────────────────────────
@@ -283,7 +273,7 @@ export function ProjectSidebar() {
       onOk: async () => {
         try {
           await modelApi.delete(model.id)
-          removeModelFromRecent(model.id)
+          recentModelApi.remove(model.id).catch(() => {})
           if (currentModelId === model.id) {
             setCurrentModelId(null)
             setCurrentDirectoryId(null)
@@ -650,7 +640,7 @@ export function ProjectSidebar() {
                       {model.name}
                     </div>
                     <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                      {model.building_count || 0} 栋建筑 · {new Date(model.updated_at).toLocaleDateString()}
+                      {model.building_count || 0} 栋建筑 · {new Date((model as any).opened_at || model.updated_at).toLocaleDateString()}
                     </div>
                   </div>
                   {currentModelId === model.id && <span style={{ fontSize: 10, color: '#1677ff' }}>当前</span>}
