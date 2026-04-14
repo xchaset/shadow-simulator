@@ -70,6 +70,10 @@ export interface Model {
   date_time: string
   building_count: number
   scene_data?: Building[]
+  // 画布设置（与模型绑定）
+  canvas_size?: number  // 画布尺寸（默认 2000）
+  show_grid?: boolean  // 是否显示网格（默认 true）
+  grid_divisions?: number  // 网格分割数（默认 200）
   sort_order: number
   created_at: string
   updated_at: string
@@ -88,18 +92,35 @@ export interface AppState {
   addBuilding: (b: Building) => void
   updateBuilding: (id: string, updates: Partial<Building>) => void
   removeBuilding: (id: string) => void
+  removeBuildings: (ids: string[]) => void
+  renameBuilding: (id: string, name: string) => void
   selectedBuildingId: string | null
   selectBuilding: (id: string | null) => void
+  // 多选支持
+  selectedBuildingIds: string[]
+  selectBuildings: (ids: string[]) => void
+  toggleBuildingSelection: (id: string) => void
+  clearSelection: () => void
   editorOpen: boolean
   setEditorOpen: (v: boolean) => void
   isDragging: boolean
   setDragging: (v: boolean) => void
+  // 框选状态
+  isBoxSelecting: boolean
+  setBoxSelecting: (v: boolean) => void
+  boxSelectStart: [number, number] | null
+  setBoxSelectStart: (pos: [number, number] | null) => void
+  boxSelectEnd: [number, number] | null
+  setBoxSelectEnd: (pos: [number, number] | null) => void
   playback: PlaybackState
   setPlayback: (p: Partial<PlaybackState>) => void
+  // 画布设置（与模型绑定）
+  canvasSize: number
+  setCanvasSize: (size: number) => void
   showGrid: boolean
   setShowGrid: (v: boolean) => void
-  showGrid: boolean
-  setShowGrid: (v: boolean) => void
+  gridDivisions: number
+  setGridDivisions: (divs: number) => void
 
   // Project
   directories: Directory[]

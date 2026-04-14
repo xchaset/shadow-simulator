@@ -1,7 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Button, Tooltip } from 'antd'
-import { BorderOutlined, BorderlessTableOutlined } from '@ant-design/icons'
 import { Ground } from './Ground'
 import { SunLight } from './SunLight'
 import { SunIndicator } from './SunIndicator'
@@ -9,6 +7,9 @@ import { CameraControls } from './CameraControls'
 import { Compass } from './Compass'
 import { FloatingEditor } from './FloatingEditor'
 import { BuildingGroup } from '../Buildings/BuildingGroup'
+import { SelectionBox } from '../Selection/SelectionBox'
+import { BoxSelectInteraction } from '../Selection/BoxSelectInteraction'
+import { CanvasSettings } from './CanvasSettings'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
 import type { Building } from '../../types'
@@ -37,59 +38,80 @@ interface ClipboardBuilding {
 
 export function SceneCanvas() {
   const selectBuilding = useStore(s => s.selectBuilding)
-  const showGrid = useStore(s => s.showGrid)
-  const setShowGrid = useStore(s => s.setShowGrid)
+  const clearSelection = useStore(s => s.clearSelection)
+  const removeBuildings = useStore(s => s.removeBuildings)
+  const addBuilding = useStore(s => s.addBuilding)
+  const boxSelectStart = useStore(s => s.boxSelectStart)
+  const boxSelectEnd = useStore(s => s.boxSelectEnd)
   const containerRef = useRef<HTMLDivElement>(null)
-  const clipboardRef = useRef<ClipboardBuilding | null>(null)
+  const clipboardRef = useRef<ClipboardBuilding[] | null>(null)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    const { selectedBuildingId, buildings, updateBuilding, addBuilding } = useStore.getState()
+    const { selectedBuildingId, selectedBuildingIds, buildings, updateBuilding } = useStore.getState()
 
-    // Ctrl+C — 复制选中建筑
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-      if (!selectedBuildingId) return
-      const building = buildings.find(b => b.id === selectedBuildingId)
-      if (!building) return
-      clipboardRef.current = {
-        type: building.type,
-        params: { ...building.params },
-        rotation: building.rotation,
-        color: building.color,
-        name: building.name,
-        position: [...building.position],
-        glbUrl: building.glbUrl,
-        glbScale: building.glbScale,
-      }
+    // 确定操作的建筑物 IDs（多选优先，否则单选）
+    const activeIds = selectedBuildingIds.length > 0 ? selectedBuildingIds : (selectedBuildingId ? [selectedBuildingId] : [])
+
+    // Delete/Backspace — 删除选中的建筑物
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (activeIds.length === 0) return
+      e.preventDefault()
+      removeBuildings(activeIds)
       return
     }
 
-    // Ctrl+V — 粘贴建筑
+    // Ctrl+C — 复制选中的建筑物
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      if (activeIds.length === 0) return
+      const selectedBuildings = buildings.filter(b => activeIds.includes(b.id))
+      clipboardRef.current = selectedBuildings.map(b => ({
+        type: b.type,
+        params: { ...b.params },
+        rotation: b.rotation,
+        color: b.color,
+        name: b.name,
+        position: [...b.position],
+        glbUrl: b.glbUrl,
+        glbScale: b.glbScale,
+      }))
+      return
+    }
+
+    // Ctrl+V — 粘贴建筑物
     if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
       const clip = clipboardRef.current
-      if (!clip) return
+      if (!clip || clip.length === 0) return
       e.preventDefault()
-      const newBuilding: Building = {
-        id: `building-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        name: `${clip.name} 副本`,
-        type: clip.type,
-        params: { ...clip.params },
-        position: [clip.position[0] + PASTE_OFFSET, clip.position[1] + PASTE_OFFSET],
-        rotation: clip.rotation,
-        color: clip.color,
-        glbUrl: clip.glbUrl,
-        glbScale: clip.glbScale,
-      }
-      addBuilding(newBuilding)
-      // 选中新建筑，并更新剪贴板位置使连续粘贴不重叠
-      useStore.getState().selectBuilding(newBuilding.id)
-      clipboardRef.current = { ...clip, position: [...newBuilding.position] }
+
+      const newIds: string[] = []
+      clip.forEach((clipItem, index) => {
+        const newBuilding: Building = {
+          id: `building-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: `${clipItem.name} 副本`,
+          type: clipItem.type,
+          params: { ...clipItem.params },
+          position: [clipItem.position[0] + PASTE_OFFSET + index * 2, clipItem.position[1] + PASTE_OFFSET + index * 2],
+          rotation: clipItem.rotation,
+          color: clipItem.color,
+          glbUrl: clipItem.glbUrl,
+          glbScale: clipItem.glbScale,
+        }
+        addBuilding(newBuilding)
+        newIds.push(newBuilding.id)
+      })
+
+      // 选中新粘贴的建筑物
+      useStore.getState().selectBuildings(newIds)
+      // 更新剪贴板以便连续粘贴
+      clipboardRef.current = clip.map((c, i) => ({
+        ...c,
+        position: [c.position[0] + PASTE_OFFSET, c.position[1] + PASTE_OFFSET],
+      }))
       return
     }
 
     // 方向键移动
-    if (!selectedBuildingId) return
-    const building = buildings.find(b => b.id === selectedBuildingId)
-    if (!building) return
+    if (activeIds.length === 0) return
 
     let dx = 0
     let dz = 0
@@ -112,10 +134,14 @@ export function SceneCanvas() {
     }
 
     e.preventDefault() // 阻止页面滚动
-    updateBuilding(selectedBuildingId, {
-      position: [building.position[0] + dx, building.position[1] + dz],
+    activeIds.forEach(id => {
+      const building = buildings.find(b => b.id === id)
+      if (!building) return
+      updateBuilding(id, {
+        position: [building.position[0] + dx, building.position[1] + dz],
+      })
     })
-  }, [])
+  }, [addBuilding, removeBuildings])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -125,33 +151,17 @@ export function SceneCanvas() {
   return (
     <div ref={containerRef} style={{ flex: 1, position: 'relative' }} tabIndex={-1}>
       <FloatingEditor />
-      {/* 网格显示/隐藏 */}
-      <Tooltip title={showGrid ? '隐藏网格' : '显示网格'} placement="left">
-        <Button
-          type="text"
-          size="small"
-          icon={showGrid ? <BorderlessTableOutlined /> : <BorderOutlined />}
-          onClick={() => setShowGrid(!showGrid)}
-          style={{
-            position: 'absolute',
-            right: 12,
-            top: 12,
-            zIndex: 10,
-            background: 'rgba(255,255,255,0.75)',
-            backdropFilter: 'blur(4px)',
-            borderRadius: 6,
-            color: showGrid ? '#1677ff' : '#999',
-          }}
-        />
-      </Tooltip>
+      <CanvasSettings />
       <Canvas
         shadows
         camera={{ position: [0, 100, -130], fov: 50, near: 0.1, far: 3000 }}
       >
         <SkyBackground />
         <SunLight />
-        <Ground onClick={() => selectBuilding(null)} />
+        <Ground onClick={() => clearSelection()} />
         <BuildingGroup />
+        <SelectionBox start={boxSelectStart} end={boxSelectEnd} />
+        <BoxSelectInteraction />
         <Compass />
         <SunIndicator />
         <CameraControls />

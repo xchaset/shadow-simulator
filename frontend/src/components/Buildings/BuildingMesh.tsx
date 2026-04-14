@@ -12,9 +12,13 @@ interface Props {
 export function BuildingMesh({ building }: Props) {
   const groupRef = useRef<THREE.Group>(null)
   const selectedId = useStore(s => s.selectedBuildingId)
+  const selectedIds = useStore(s => s.selectedBuildingIds)
   const selectBuilding = useStore(s => s.selectBuilding)
+  const toggleBuildingSelection = useStore(s => s.toggleBuildingSelection)
   const setEditorOpen = useStore(s => s.setEditorOpen)
   const isSelected = selectedId === building.id
+  const isMultiSelected = selectedIds.includes(building.id)
+  const isSelectedVisual = isSelected || isMultiSelected
 
   const geometries = useMemo(
     () => createBuildingGeometries(building.type, building.params),
@@ -24,8 +28,13 @@ export function BuildingMesh({ building }: Props) {
   // 单击 → 选中
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    selectBuilding(building.id)
-  }, [building.id, selectBuilding])
+    // 如果按住 Alt 键，切换选择；否则单选
+    if (e.altKey) {
+      toggleBuildingSelection(building.id)
+    } else {
+      selectBuilding(building.id)
+    }
+  }, [building.id, selectBuilding, toggleBuildingSelection])
 
   // 双击 → 打开编辑面板
   const handleDoubleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
@@ -56,13 +65,13 @@ export function BuildingMesh({ building }: Props) {
                 ? (building.params as any).roofColor || building.color
                 : item.color ?? building.color
             }
-            transparent={isSelected}
-            opacity={isSelected ? 0.85 : 1}
+            transparent={isSelectedVisual}
+            opacity={isSelectedVisual ? 0.85 : 1}
           />
-          {isSelected && (
+          {isSelectedVisual && (
             <lineSegments>
               <edgesGeometry args={[item.geometry]} />
-              <lineBasicMaterial color="#ffffff" linewidth={2} />
+              <lineBasicMaterial color={isMultiSelected ? "#52c41a" : "#ffffff"} linewidth={2} />
             </lineSegments>
           )}
         </mesh>

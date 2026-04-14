@@ -5,7 +5,9 @@ interface GroundProps {
 }
 
 export function Ground({ onClick }: GroundProps) {
+  const canvasSize = useStore(s => s.canvasSize)
   const showGrid = useStore(s => s.showGrid)
+  const gridDivisions = useStore(s => s.gridDivisions)
 
   return (
     <group>
@@ -15,11 +17,11 @@ export function Ground({ onClick }: GroundProps) {
         position={[0, 0, 0]}
         onClick={onClick}
       >
-        <planeGeometry args={[500, 500]} />
+        <planeGeometry args={[canvasSize, canvasSize]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
       {showGrid && (
-        <gridHelper args={[500, 50, '#cccccc', '#dddddd']} position={[0, 0.01, 0]} />
+        <gridHelper args={[canvasSize, gridDivisions, '#cccccc', '#dddddd']} position={[0, 0.01, 0]} />
       )}
     </group>
   )

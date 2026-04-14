@@ -41,6 +41,9 @@ db.exec(`
     date_time       TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     building_count  INTEGER NOT NULL DEFAULT 0,
     scene_data      TEXT NOT NULL DEFAULT '[]',
+    canvas_size     REAL NOT NULL DEFAULT 2000,
+    show_grid       INTEGER NOT NULL DEFAULT 1,
+    grid_divisions  INTEGER NOT NULL DEFAULT 200,
     thumbnail       TEXT DEFAULT NULL,
     sort_order      INTEGER DEFAULT 0,
     created_at      TEXT DEFAULT (datetime('now', 'localtime')),
@@ -50,5 +53,23 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_models_directory ON models(directory_id);
 `)
+
+// ─── Migration: Add canvas settings columns to models table ──────────────────
+
+// Check if canvas_size column exists, if not, add it
+const columns = db.prepare(`PRAGMA table_info(models)`).all() as any[]
+const columnNames = columns.map(c => c.name)
+
+if (!columnNames.includes('canvas_size')) {
+  db.exec(`ALTER TABLE models ADD COLUMN canvas_size REAL NOT NULL DEFAULT 2000`)
+}
+
+if (!columnNames.includes('show_grid')) {
+  db.exec(`ALTER TABLE models ADD COLUMN show_grid INTEGER NOT NULL DEFAULT 1`)
+}
+
+if (!columnNames.includes('grid_divisions')) {
+  db.exec(`ALTER TABLE models ADD COLUMN grid_divisions INTEGER NOT NULL DEFAULT 200`)
+}
 
 export default db

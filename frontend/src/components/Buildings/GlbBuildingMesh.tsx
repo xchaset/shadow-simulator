@@ -17,9 +17,13 @@ interface Props {
 export function GlbBuildingMesh({ building }: Props) {
   const groupRef = useRef<THREE.Group>(null)
   const selectedId = useStore(s => s.selectedBuildingId)
+  const selectedIds = useStore(s => s.selectedBuildingIds)
   const selectBuilding = useStore(s => s.selectBuilding)
+  const toggleBuildingSelection = useStore(s => s.toggleBuildingSelection)
   const setEditorOpen = useStore(s => s.setEditorOpen)
   const isSelected = selectedId === building.id
+  const isMultiSelected = selectedIds.includes(building.id)
+  const isSelectedVisual = isSelected || isMultiSelected
 
   const [loadError, setLoadError] = useState(false)
   const [scene, setScene] = useState<THREE.Group | null>(null)
@@ -63,7 +67,7 @@ export function GlbBuildingMesh({ building }: Props) {
 
   // 选中时的高亮边框
   const outlineMeshes = useMemo(() => {
-    if (!isSelected || !scene) return []
+    if (!isSelectedVisual || !scene) return []
     const meshes: THREE.Mesh[] = []
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -71,12 +75,17 @@ export function GlbBuildingMesh({ building }: Props) {
       }
     })
     return meshes
-  }, [isSelected, scene])
+  }, [isSelectedVisual, scene])
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    selectBuilding(building.id)
-  }, [building.id, selectBuilding])
+    // 如果按住 Alt 键，切换选择；否则单选
+    if (e.altKey) {
+      toggleBuildingSelection(building.id)
+    } else {
+      selectBuilding(building.id)
+    }
+  }, [building.id, selectBuilding, toggleBuildingSelection])
 
   const handleDoubleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
@@ -117,10 +126,10 @@ export function GlbBuildingMesh({ building }: Props) {
     >
       <primitive object={scene} />
       {/* 选中高亮 */}
-      {isSelected && outlineMeshes.map((mesh, i) => (
+      {isSelectedVisual && outlineMeshes.map((mesh, i) => (
         <lineSegments key={i} position={mesh.position} rotation={mesh.rotation} scale={mesh.scale}>
           <edgesGeometry args={[mesh.geometry]} />
-          <lineBasicMaterial color="#ffffff" linewidth={2} />
+          <lineBasicMaterial color={isMultiSelected ? "#52c41a" : "#ffffff"} linewidth={2} />
         </lineSegments>
       ))}
     </group>

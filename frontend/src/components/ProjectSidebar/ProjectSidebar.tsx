@@ -21,6 +21,7 @@ export function ProjectSidebar() {
     setBuildings, setLocation, setDateTime,
     setCurrentModelId, setCurrentDirectoryId,
     setDirty, setDirectories, directories,
+    setCanvasSize, setShowGrid, setGridDivisions,
   } = useStore()
 
   const [models, setModels] = useState<Record<string, Model[]>>({})
@@ -32,6 +33,7 @@ export function ProjectSidebar() {
   const [renaming, setRenaming] = useState<{ type: 'dir' | 'model'; id: string } | null>(null)
   const renameInputRef = useRef<InputRef>(null)
   const composingRef = useRef(false)
+  const renameTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Move modal state
   const [moveModal, setMoveModal] = useState<{ type: 'model'; id: string; currentDirId: string } | null>(null)
@@ -73,10 +75,14 @@ export function ProjectSidebar() {
     if (model.date_time) {
       setDateTime(new Date(model.date_time))
     }
+    // 加载画布设置（如果模型中有保存的话）
+    if (model.canvas_size !== undefined) setCanvasSize(model.canvas_size)
+    if (model.show_grid !== undefined) setShowGrid(model.show_grid)
+    if (model.grid_divisions !== undefined) setGridDivisions(model.grid_divisions)
     setCurrentModelId(model.id)
     setCurrentDirectoryId(model.directory_id)
     setDirty(false)
-  }, [setBuildings, setLocation, setDateTime, setCurrentModelId, setCurrentDirectoryId, setDirty])
+  }, [setBuildings, setLocation, setDateTime, setCanvasSize, setShowGrid, setGridDivisions, setCurrentModelId, setCurrentDirectoryId, setDirty])
 
   // ─── Directory operations ───────────────────────────────
 
@@ -137,6 +143,24 @@ export function ProjectSidebar() {
       message.error('重命名失败: ' + err.message)
     }
     setRenaming(null)
+  }
+
+  const handleCancelRename = () => {
+    if (renameTimeoutRef.current) {
+      clearTimeout(renameTimeoutRef.current)
+      renameTimeoutRef.current = null
+    }
+    setRenaming(null)
+  }
+
+  // 双击模型重命名
+  const handleModelDblClick = (id: string) => {
+    setRenaming({ type: 'model', id })
+    renameTimeoutRef.current = setTimeout(() => {
+      renameInputRef.current?.focus()
+      renameInputRef.current?.select()
+      renameTimeoutRef.current = null
+    }, 50)
   }
 
   // ─── Copy / Move operations ─────────────────────────────
@@ -274,6 +298,9 @@ export function ProjectSidebar() {
         location_lng: location.lng,
         city_name: location.cityName,
         date_time: dateTime.toISOString(),
+        canvas_size: useStore.getState().canvasSize,
+        show_grid: useStore.getState().showGrid,
+        grid_divisions: useStore.getState().gridDivisions,
       })
       setDirty(false)
       await fetchDirectories()
@@ -310,11 +337,14 @@ export function ProjectSidebar() {
         defaultValue={dir.name}
         onBlur={handleRenameConfirm}
         onPressEnter={() => { if (!composingRef.current) handleRenameConfirm() }}
+        onKeyDown={e => {
+          if (e.key === 'Escape') handleCancelRename()
+          e.stopPropagation()
+        }}
         onCompositionStart={() => { composingRef.current = true }}
         onCompositionEnd={() => { composingRef.current = false }}
-        onKeyDown={e => e.stopPropagation()}
         autoFocus
-        style={{ width: 130 }}
+        style={{ width: 120 }}
         onClick={e => e.stopPropagation()}
       />
     ) : (
@@ -334,7 +364,9 @@ export function ProjectSidebar() {
         }}
         trigger={['contextMenu']}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%' }}>
+        <span
+          style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%' }}
+        >
           {expandedKeys.includes(`dir-${dir.id}`)
             ? <FolderOpenOutlined style={{ color: '#faad14' }} />
             : <FolderOutlined style={{ color: '#faad14' }} />}
@@ -344,6 +376,12 @@ export function ProjectSidebar() {
           <span style={{ color: '#999', fontSize: 11, flexShrink: 0 }}>
             {models[dir.id]?.length || 0}
           </span>
+          <PlusOutlined
+            style={{ color: '#999', fontSize: 12, flexShrink: 0, cursor: 'pointer', padding: '0 2px' }}
+            onClick={(e) => { e.stopPropagation(); handleCreateModel(dir.id) }}
+            onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#1677ff' }}
+            onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#999' }}
+          />
         </span>
       </Dropdown>
     ),
@@ -357,11 +395,14 @@ export function ProjectSidebar() {
           defaultValue={model.name}
           onBlur={handleRenameConfirm}
           onPressEnter={() => { if (!composingRef.current) handleRenameConfirm() }}
+          onKeyDown={e => {
+            if (e.key === 'Escape') handleCancelRename()
+            e.stopPropagation()
+          }}
           onCompositionStart={() => { composingRef.current = true }}
           onCompositionEnd={() => { composingRef.current = false }}
-          onKeyDown={e => e.stopPropagation()}
           autoFocus
-          style={{ width: 130 }}
+          style={{ width: 120 }}
           onClick={e => e.stopPropagation()}
         />
       ) : (
@@ -385,11 +426,14 @@ export function ProjectSidebar() {
           }}
           trigger={['contextMenu']}
         >
-          <span style={{
-            display: 'flex', alignItems: 'center', gap: 4, width: '100%',
-            fontWeight: currentModelId === model.id ? 600 : 400,
-            color: currentModelId === model.id ? '#1677ff' : undefined,
-          }}>
+          <span
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+              fontWeight: currentModelId === model.id ? 600 : 400,
+              color: currentModelId === model.id ? '#1677ff' : undefined,
+            }}
+            onDoubleClick={(e) => { e.stopPropagation(); handleModelDblClick(model.id) }}
+          >
             <FileOutlined style={{ color: currentModelId === model.id ? '#1677ff' : '#8c8c8c' }} />
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {model.name}

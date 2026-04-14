@@ -1,8 +1,8 @@
-import { useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../../store/useStore'
 import { BUILDING_PRESETS } from '../../utils/buildings'
-import { InputNumber, Slider, ColorPicker, Button } from 'antd'
-import { DeleteOutlined, CloseOutlined } from '@ant-design/icons'
+import { InputNumber, Slider, ColorPicker, Button, Input } from 'antd'
+import { DeleteOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons'
 import { BuildingIcon } from '../BuildingIcon'
 
 export function FloatingEditor() {
@@ -11,10 +11,51 @@ export function FloatingEditor() {
   const updateBuilding = useStore(s => s.updateBuilding)
   const removeBuilding = useStore(s => s.removeBuilding)
   const selectBuilding = useStore(s => s.selectBuilding)
+  const renameBuilding = useStore(s => s.renameBuilding)
   const editorOpen = useStore(s => s.editorOpen)
   const setEditorOpen = useStore(s => s.setEditorOpen)
 
   const building = buildings.find(b => b.id === selectedId)
+
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<any>(null)
+
+  // 自动聚焦重命名输入框
+  useEffect(() => {
+    if (isRenaming && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [isRenaming])
+
+  const startRename = useCallback(() => {
+    if (!building) return
+    setIsRenaming(true)
+    setRenameValue(building.name)
+  }, [building])
+
+  const commitRename = useCallback(() => {
+    if (selectedId && renameValue.trim()) {
+      renameBuilding(selectedId, renameValue.trim())
+    }
+    setIsRenaming(false)
+    setRenameValue('')
+  }, [selectedId, renameValue, renameBuilding])
+
+  const cancelRename = useCallback(() => {
+    setIsRenaming(false)
+    setRenameValue('')
+  }, [])
+
+  const handleRenameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commitRename()
+    } else if (e.key === 'Escape') {
+      cancelRename()
+    }
+  }, [commitRename, cancelRename])
 
   const handleParamChange = useCallback((key: string, value: number | null) => {
     if (!building || value === null) return

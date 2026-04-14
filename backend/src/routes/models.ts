@@ -34,7 +34,8 @@ router.get('/directories/:dirId/models', validate(schema.listModels), (req, res)
   const { dirId } = req.params
   const rows = db.prepare(`
     SELECT id, directory_id, name, description, location_lat, location_lng,
-           city_name, date_time, building_count, sort_order, created_at, updated_at
+           city_name, date_time, building_count, canvas_size, show_grid, grid_divisions,
+           sort_order, created_at, updated_at
     FROM models
     WHERE directory_id = ?
     ORDER BY sort_order ASC, created_at ASC
@@ -52,6 +53,7 @@ router.post('/directories/:dirId/models', validate(schema.createModel), (req, re
   const {
     name, description, location_lat, location_lng,
     city_name, date_time, scene_data, sort_order,
+    canvas_size, show_grid, grid_divisions,
   } = req.body
 
   const { str: sceneStr, count: buildingCount } = normalizeSceneData(scene_data)
@@ -60,10 +62,12 @@ router.post('/directories/:dirId/models', validate(schema.createModel), (req, re
 
   db.prepare(`
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
-                        city_name, date_time, building_count, scene_data, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        city_name, date_time, building_count, scene_data, sort_order,
+                        canvas_size, show_grid, grid_divisions)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, dirId, name, description, location_lat, location_lng,
-         city_name, dt, buildingCount, sceneStr, sort_order)
+         city_name, dt, buildingCount, sceneStr, sort_order,
+         canvas_size ?? 2000, show_grid !== undefined ? (show_grid ? 1 : 0) : 1, grid_divisions ?? 200)
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
   res.status(201).json(parseRow(row))
@@ -84,7 +88,8 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
   if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
 
   const { name, description, location_lat, location_lng, city_name,
-          date_time, scene_data, sort_order } = req.body
+          date_time, scene_data, sort_order,
+          canvas_size, show_grid, grid_divisions } = req.body
 
   const updates: string[] = []
   const values: any[] = []
@@ -96,6 +101,9 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
   if (city_name !== undefined) { updates.push('city_name = ?'); values.push(city_name) }
   if (date_time !== undefined) { updates.push('date_time = ?'); values.push(date_time) }
   if (sort_order !== undefined) { updates.push('sort_order = ?'); values.push(sort_order) }
+  if (canvas_size !== undefined) { updates.push('canvas_size = ?'); values.push(canvas_size) }
+  if (show_grid !== undefined) { updates.push('show_grid = ?'); values.push(show_grid ? 1 : 0) }
+  if (grid_divisions !== undefined) { updates.push('grid_divisions = ?'); values.push(grid_divisions) }
 
   if (scene_data !== undefined) {
     const { str, count } = normalizeSceneData(scene_data)
@@ -130,11 +138,13 @@ router.post('/models/:id/copy', validate(schema.getModel), (req, res) => {
 
   db.prepare(`
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
-                        city_name, date_time, building_count, scene_data, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        city_name, date_time, building_count, scene_data, sort_order,
+                        canvas_size, show_grid, grid_divisions)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(newId, targetDirId, newName, existing.description, existing.location_lat,
          existing.location_lng, existing.city_name, existing.date_time,
-         existing.building_count, existing.scene_data, existing.sort_order)
+         existing.building_count, existing.scene_data, existing.sort_order,
+         existing.canvas_size, existing.show_grid, existing.grid_divisions)
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(newId)
   res.status(201).json(parseRow(row))

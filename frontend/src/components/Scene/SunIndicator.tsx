@@ -11,6 +11,10 @@ const SAMPLES = 120
 const MIN_ARC_RADIUS = 80
 /** 弧线半径相对最高建筑的倍数（保证太阳始终高于建筑） */
 const ARC_RADIUS_FACTOR = 3.0
+/** 太阳球体半径 */
+const SUN_RADIUS = 8
+/** 太阳光晕半径 */
+const SUN_GLOW_RADIUS = 14
 
 export function SunIndicator() {
   const { lightPosition, isNight, altitude } = useSunPosition()
@@ -40,6 +44,65 @@ export function SunIndicator() {
       lightPosition[2] * scale,
     ]
   }, [lightPosition, arcRadius])
+
+  // ── 太阳强度和颜色（根据高度角动态变化） ──
+  const sunVisuals = useMemo(() => {
+    if (isNight) {
+      return {
+        color: '#4a5568',
+        glowColor: '#2d3748',
+        glowRadius: SUN_GLOW_RADIUS * 0.5,
+        glowOpacity: 0.05,
+        intensity: 0.2,
+      }
+    }
+
+    // 太阳高度角归一化 (0~1)
+    const altitudeNorm = Math.max(0, Math.min(1, altitude / (Math.PI / 2)))
+    
+    // 早晨/黄昏 (altitude < 0.3): 橙色、强光晕
+    // 中午 (altitude > 0.6): 亮黄色、弱光晕
+    if (altitudeNorm < 0.15) {
+      // 日出/日落：深橙色，大光晕
+      return {
+        color: '#f97316',
+        glowColor: '#fed7aa',
+        glowRadius: SUN_GLOW_RADIUS * 1.8,
+        glowOpacity: 0.4,
+        intensity: 0.6,
+      }
+    } else if (altitudeNorm < 0.3) {
+      // 早晨/傍晚：橙色，较大光晕
+      const t = (altitudeNorm - 0.15) / 0.15
+      return {
+        color: '#fb923c',
+        glowColor: '#ffedd5',
+        glowRadius: SUN_GLOW_RADIUS * (1.8 - t * 0.5),
+        glowOpacity: 0.4 - t * 0.1,
+        intensity: 0.6 + t * 0.2,
+      }
+    } else if (altitudeNorm < 0.6) {
+      // 上午/下午：金黄色，中等光晕
+      const t = (altitudeNorm - 0.3) / 0.3
+      return {
+        color: '#fbbf24',
+        glowColor: '#fde68a',
+        glowRadius: SUN_GLOW_RADIUS * (1.3 - t * 0.3),
+        glowOpacity: 0.3 - t * 0.1,
+        intensity: 0.8 + t * 0.2,
+      }
+    } else {
+      // 中午：亮黄色，小光晕
+      const t = (altitudeNorm - 0.6) / 0.4
+      return {
+        color: '#fde047',
+        glowColor: '#fef08a',
+        glowRadius: SUN_GLOW_RADIUS * (1.0 - t * 0.2),
+        glowOpacity: 0.2 - t * 0.05,
+        intensity: 1.0,
+      }
+    }
+  }, [isNight, altitude])
 
   // ── 全天轨迹弧线（日出→日落） ──
   const pathPoints = useMemo(() => {
@@ -84,23 +147,21 @@ export function SunIndicator() {
 
       {/* 太阳球体 */}
       <mesh position={sunPos}>
-        <sphereGeometry args={[2.5, 24, 24]} />
+        <sphereGeometry args={[SUN_RADIUS, 24, 24]} />
         <meshBasicMaterial
-          color={isNight ? '#4a5568' : '#fbbf24'}
+          color={sunVisuals.color}
         />
       </mesh>
 
-      {/* 太阳光晕 */}
-      {!isNight && (
-        <mesh position={sunPos}>
-          <sphereGeometry args={[4, 24, 24]} />
-          <meshBasicMaterial
-            color="#fde68a"
-            transparent
-            opacity={0.2}
-          />
-        </mesh>
-      )}
+      {/* 太阳光晕（随时间动态变化） */}
+      <mesh position={sunPos}>
+        <sphereGeometry args={[sunVisuals.glowRadius, 24, 24]} />
+        <meshBasicMaterial
+          color={sunVisuals.glowColor}
+          transparent
+          opacity={sunVisuals.glowOpacity}
+        />
+      </mesh>
 
       {/* 投影虚线（太阳 → 地面） */}
       {projLine && (

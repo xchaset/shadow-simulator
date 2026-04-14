@@ -11,6 +11,7 @@ import { useStore } from '../../store/useStore'
 export function CameraControls() {
   const controlsRef = useRef<any>(null)
   const isDragging = useStore(s => s.isDragging)
+  const isBoxSelecting = useStore(s => s.isBoxSelecting)
 
   // 初始化相机位置：从北方看向原点
   useEffect(() => {
@@ -37,12 +38,12 @@ export function CameraControls() {
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={!isDragging}
+      enabled={!isDragging && !isBoxSelecting}
       maxPolarAngle={Math.PI / 2 - 0.05}
       enableDamping
       dampingFactor={0.1}
       minDistance={5}
-      maxDistance={1500}
+      maxDistance={3000} // 从 1500 扩大到 3000，支持更大的画布
     />
   )
 }

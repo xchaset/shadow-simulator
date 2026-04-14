@@ -20,6 +20,22 @@ export const createModel: ValidationSchema = {
     date_time: commonRules.dateTime,
     scene_data: commonRules.buildingArray,
     sort_order: commonRules.sortOrder,
+    canvas_size: {
+      type: 'number',
+      required: false,
+      min: 100,
+      max: 10000,
+    },
+    show_grid: {
+      type: 'boolean',
+      required: false,
+    },
+    grid_divisions: {
+      type: 'number',
+      required: false,
+      min: 10,
+      max: 500,
+    },
   },
 }
 
@@ -75,6 +91,22 @@ export const updateModel: ValidationSchema = {
       type: 'number',
       required: false,
       min: 0,
+    },
+    canvas_size: {
+      type: 'number',
+      required: false,
+      min: 100,
+      max: 10000,
+    },
+    show_grid: {
+      type: 'boolean',
+      required: false,
+    },
+    grid_divisions: {
+      type: 'number',
+      required: false,
+      min: 10,
+      max: 500,
     },
   },
 }
