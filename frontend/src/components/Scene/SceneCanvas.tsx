@@ -11,7 +11,6 @@ import { SelectionBox } from '../Selection/SelectionBox'
 import { BoxSelectInteraction } from '../Selection/BoxSelectInteraction'
 import { CanvasSettings } from './CanvasSettings'
 import { TerrainEditor } from '../Terrain/TerrainEditor'
-import { TerrainToolbar } from '../Terrain/TerrainToolbar'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
 import { modelApi, recentModelApi } from '../../utils/api'
@@ -207,9 +206,6 @@ export function SceneCanvas() {
     <div ref={containerRef} style={{ flex: 1, position: 'relative' }} tabIndex={-1}>
       <FloatingEditor />
       <CanvasSettings />
-
-      {/* 地形工具栏 */}
-      {terrainEditor.enabled && <TerrainToolbar onReset={handleTerrainReset} />}
 
       <Canvas
         shadows

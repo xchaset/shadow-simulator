@@ -14,6 +14,7 @@ import { useStore } from '../../store/useStore'
 import { directoryApi, modelApi, recentModelApi } from '../../utils/api'
 import { loadState, saveState } from '../../utils/storage'
 import type { Directory, Model } from '../../types'
+import { TerrainToolbar } from '../Terrain/TerrainToolbar'
 
 export function ProjectSidebar() {
   const {
@@ -23,6 +24,7 @@ export function ProjectSidebar() {
     setCurrentModelId, setCurrentDirectoryId,
     setDirty, setDirectories, directories,
     setCanvasSize, setShowGrid, setGridDivisions, setTerrainData,
+    terrainEditor, setTerrainEditor,
   } = useStore()
 
   const [models, setModels] = useState<Record<string, Model[]>>({})
@@ -663,6 +665,11 @@ export function ProjectSidebar() {
           <span>{buildings.length} 栋建筑</span>
           {dirty && <span style={{ color: '#faad14' }}>● 未保存</span>}
         </div>
+      )}
+
+      {/* 地貌编辑工具栏 - 显示在左侧边栏内 */}
+      {terrainEditor.enabled && (
+        <TerrainToolbar onReset={() => setTerrainEditor({ enabled: false })} />
       )}
 
       {/* Move Modal */}

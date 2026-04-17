@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Button, Slider, Radio, Space, Tooltip, Divider } from 'antd'
 import {
   RiseOutlined,
@@ -11,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { useStore } from '../../store/useStore'
 import type { TerrainBrushMode } from '../../types'
+
 
 interface TerrainToolbarProps {
   onReset: () => void
@@ -54,44 +56,41 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
   }
 
   // 键盘快捷键
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-    switch (e.key.toLowerCase()) {
-      case 'q':
-        handleModeChange('raise')
-        break
-      case 'w':
-        handleModeChange('lower')
-        break
-      case 'e':
-        handleModeChange('smooth')
-        break
-      case 'r':
-        handleModeChange('flatten')
-        break
-      case 'z':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault()
-          if (e.shiftKey) terrainRedo()
-          else terrainUndo()
-        }
-        break
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      switch (e.key.toLowerCase()) {
+        case 'q':
+          setTerrainEditor({ brushMode: 'raise' })
+          break
+        case 'w':
+          setTerrainEditor({ brushMode: 'lower' })
+          break
+        case 'e':
+          setTerrainEditor({ brushMode: 'smooth' })
+          break
+        case 'r':
+          setTerrainEditor({ brushMode: 'flatten' })
+          break
+        case 'z':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (e.shiftKey) terrainRedo()
+            else terrainUndo()
+          }
+          break
+      }
     }
-  }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [setTerrainEditor, terrainUndo, terrainRedo])
 
   return (
     <div
       style={{
-        position: 'absolute',
-        top: 12,
-        left: 252,
-        zIndex: 100,
-        background: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: 8,
+        background: '#fff',
+        borderTop: '1px solid #e8e8e8',
         padding: '12px 16px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-        backdropFilter: 'blur(8px)',
-        maxWidth: 320,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>

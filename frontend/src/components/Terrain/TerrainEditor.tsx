@@ -13,7 +13,8 @@ interface TerrainEditorProps {
  * 不自带 mesh，通过 geometryRef 操作 Ground 中的几何体
  */
 export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProps) {
-  const { camera, gl } = useThree()
+  const { camera, gl, raycaster } = useThree()
+  const cameraRef = useRef(camera)
   const isDrawingRef = useRef(false)
   const lastPosRef = useRef<[number, number] | null>(null)
 
@@ -46,8 +47,20 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
   // 应用笔刷
   const applyBrush = useCallback((worldX: number, worldZ: number, isFirst: boolean) => {
-    const data = useStore.getState().terrainData
-    if (!data) return
+    console.log('[TerrainEditor] applyBrush called', { worldX, worldZ, isFirst })
+    let data = useStore.getState().terrainData
+    console.log('[TerrainEditor] data before init:', data ? { resolution: data.resolution, heightsLength: data.heights?.length } : null)
+    if (!data || !data.heights || data.heights.length === 0) {
+      console.log('[TerrainEditor] initializing terrainData')
+      const count = 128 * 128
+      const newData = {
+        resolution: 128,
+        heights: new Float32Array(count),
+        maxHeight: 50,
+      }
+      useStore.getState().setTerrainData(newData)
+      data = newData
+    }
 
     const { brushMode, brushRadius, brushStrength } = useStore.getState().terrainEditor
     const [cx, cy] = worldToIndex(worldX, worldZ)
@@ -57,8 +70,10 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       useStore.getState().pushTerrainUndo()
     }
 
+    // 直接修改 heights 数组（因为 Float32Array 是可变对象）
     const heights = data.heights as Float32Array
     const resolution = data.resolution
+    console.log('[TerrainEditor] heights after init:', { length: heights.length, sample: heights[0] })
 
     for (let dy = -radiusInIndices; dy <= radiusInIndices; dy++) {
       for (let dx = -radiusInIndices; dx <= radiusInIndices; dx++) {
@@ -109,7 +124,10 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
     // 更新几何体顶点
     const geometry = geometryRef.current
+    console.log('[TerrainEditor] geometry:', geometry)
     if (geometry) {
+      console.log('[TerrainEditor] position count:', geometry.attributes.position.count)
+      console.log('[TerrainEditor] sample heights before:', heights[0], heights[100], heights[1000])
       const pos = geometry.attributes.position
       for (let i = 0; i < resolution; i++) {
         for (let j = 0; j < resolution; j++) {
@@ -118,7 +136,16 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       }
       pos.needsUpdate = true
       geometry.computeVertexNormals()
+      console.log('[TerrainEditor] mesh updated, sample pos:', pos.getZ(0), pos.getZ(100), pos.getZ(1000))
     }
+
+    // 更新 store 中的 terrainData
+    useStore.getState().setTerrainData({
+      resolution: data.resolution,
+      heights: data.heights,
+      maxHeight: data.maxHeight,
+    })
+    console.log('[TerrainEditor] terrainData updated in store')
 
     onHeightChange()
   }, [canvasSize, worldToIndex, geometryRef, onHeightChange])
@@ -131,18 +158,17 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
     }
 
-    const raycaster = useThree.getState().raycaster
-    const currentCamera = useThree.getState().camera
-    raycaster.setFromCamera(mouse, currentCamera)
+    raycaster.setFromCamera(mouse, cameraRef.current)
 
     const groundPlane = new Plane(new Vector3(0, 1, 0), 0)
     const hit = new Vector3()
     raycaster.ray.intersectPlane(groundPlane, hit)
 
     return hit ? [hit.x, hit.z] : null
-  }, [gl])
+  }, [gl, raycaster])
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
+    console.log('[TerrainEditor] handlePointerDown called', { enabled: terrainEditor.enabled, button: e.button })
     if (!terrainEditor.enabled || e.button !== 0) return
     e.preventDefault()
     isDrawingRef.current = true

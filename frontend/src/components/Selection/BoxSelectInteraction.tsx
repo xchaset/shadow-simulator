@@ -10,6 +10,7 @@ import { useStore } from '../../store/useStore'
 export function BoxSelectInteraction() {
   const { camera, gl } = useThree()
   const isDraggingRef = useRef(false)
+  const hasMovedRef = useRef(false)
   const startPosRef = useRef<THREE.Vector2 | null>(null)
 
   const setBoxSelecting = useStore(s => s.setBoxSelecting)
