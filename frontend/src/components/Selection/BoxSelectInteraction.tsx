@@ -5,187 +5,175 @@ import { useStore } from '../../store/useStore'
 
 /**
  * 框选交互组件
- * 处理 Alt+鼠标拖拽选择建筑物
+ * Alt+左键拖拽选择建筑物
+ *
+ * 全部使用 pointer 事件（capture 阶段），在 R3F / OrbitControls 之前拦截。
+ * pointerdown 的 preventDefault() 会阻止后续 mousedown/click，
+ * 所以不再注册 mouse 事件。
  */
 export function BoxSelectInteraction() {
   const { camera, gl } = useThree()
   const isDraggingRef = useRef(false)
-  const hasMovedRef = useRef(false)
-  const startPosRef = useRef<THREE.Vector2 | null>(null)
+  const justFinishedRef = useRef(false)
 
   const setBoxSelecting = useStore(s => s.setBoxSelecting)
   const setBoxSelectStart = useStore(s => s.setBoxSelectStart)
   const setBoxSelectEnd = useStore(s => s.setBoxSelectEnd)
-  const selectBuildings = useStore(s => s.selectBuildings)
-  const buildings = useStore(s => s.buildings)
 
-  // 屏幕坐标转 3D 地面坐标
-  const screenToGround = useCallback(
+  // 屏幕坐标 → 世界坐标（射线与 y=0 平面求交）
+  const screenToWorld = useCallback(
     (screenX: number, screenY: number): [number, number] | null => {
       const rect = gl.domElement.getBoundingClientRect()
-      const mouse = new THREE.Vector2(
+      const ndc = new THREE.Vector2(
         ((screenX - rect.left) / rect.width) * 2 - 1,
-        -((screenY - rect.top) / rect.height) * 2 + 1
+        -((screenY - rect.top) / rect.height) * 2 + 1,
       )
-
       const raycaster = new THREE.Raycaster()
-      raycaster.setFromCamera(mouse, camera)
-
-      // 与地面 y=0 平面相交
-      const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-      const intersection = new THREE.Vector3()
-      raycaster.ray.intersectPlane(groundPlane, intersection)
-
-      if (intersection) {
-        return [intersection.x, intersection.z]
+      raycaster.setFromCamera(ndc, camera)
+      const hit = new THREE.Vector3()
+      if (raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) {
+        return [hit.x, hit.z]
       }
       return null
     },
-    [camera, gl]
+    [camera, gl],
   )
 
-  // 检查建筑物是否在框选范围内
+  // AABB 相交检测（框与建筑有重叠即选中）
   const isBuildingInBox = useCallback(
     (
-      buildingPos: [number, number],
+      pos: [number, number],
+      params: Record<string, number>,
+      rotation: number,
       start: [number, number],
-      end: [number, number]
+      end: [number, number],
     ): boolean => {
-      const minX = Math.min(start[0], end[0])
-      const maxX = Math.max(start[0], end[0])
-      const minZ = Math.min(start[1], end[1])
-      const maxZ = Math.max(start[1], end[1])
+      const boxMinX = Math.min(start[0], end[0])
+      const boxMaxX = Math.max(start[0], end[0])
+      const boxMinZ = Math.min(start[1], end[1])
+      const boxMaxZ = Math.max(start[1], end[1])
 
-      return (
-        buildingPos[0] >= minX &&
-        buildingPos[0] <= maxX &&
-        buildingPos[1] >= minZ &&
-        buildingPos[1] <= maxZ
-      )
+      const w = params.width || 20
+      const d = params.depth || 15
+      const rad = (rotation * Math.PI) / 180
+      const cos = Math.cos(rad)
+      const sin = Math.sin(rad)
+      const hw = w / 2
+      const hd = d / 2
+
+      const corners = [
+        [-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd],
+      ].map(([dx, dz]) => [
+        pos[0] + dx * cos - dz * sin,
+        pos[1] + dx * sin + dz * cos,
+      ])
+
+      const bMinX = Math.min(...corners.map(c => c[0]))
+      const bMaxX = Math.max(...corners.map(c => c[0]))
+      const bMinZ = Math.min(...corners.map(c => c[1]))
+      const bMaxZ = Math.max(...corners.map(c => c[1]))
+
+      return bMaxX >= boxMinX && bMinX <= boxMaxX && bMaxZ >= boxMinZ && bMinZ <= boxMaxZ
     },
-    []
+    [],
   )
 
-  // 完成框选，更新选中状态
-  const finishBoxSelect = useCallback(
-    (endPos3D: [number, number]) => {
-      const startPos = startPosRef.current
-      if (!startPos) return
+  const finishBoxSelect = useCallback(() => {
+    const boxStart = useStore.getState().boxSelectStart
+    const boxEnd = useStore.getState().boxSelectEnd
 
-      const start3D = screenToGround(startPos.x, startPos.y)
-      if (!start3D) return
+    setBoxSelecting(false)
+    setBoxSelectStart(null)
+    setBoxSelectEnd(null)
 
-      const selectedIds = buildings
-        .filter(b => isBuildingInBox(b.position, start3D, endPos3D))
-        .map(b => b.id)
+    if (!boxStart || !boxEnd) return
 
-      selectBuildings(selectedIds)
-      setBoxSelecting(false)
-      setBoxSelectStart(null)
-      setBoxSelectEnd(null)
-      startPosRef.current = null
-    },
-    [buildings, isBuildingInBox, screenToGround, selectBuildings, setBoxSelecting, setBoxSelectStart, setBoxSelectEnd]
-  )
+    const selectedIds = useStore.getState().buildings
+      .filter(b => isBuildingInBox(b.position, b.params || {}, b.rotation ?? 0, boxStart, boxEnd))
+      .map(b => b.id)
 
-  // 监听 Alt 键
+    useStore.setState({ selectedBuildingIds: selectedIds, editorOpen: false })
+  }, [isBuildingInBox, setBoxSelecting, setBoxSelectStart, setBoxSelectEnd])
+
+  /** Alt+左键 且 非地貌编辑模式 */
+  const shouldActivate = useCallback((e: PointerEvent) => {
+    return e.altKey && e.button === 0 && !useStore.getState().terrainEditor.enabled
+  }, [])
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        e.preventDefault()
+    const onPointerDown = (e: PointerEvent) => {
+      if (!shouldActivate(e)) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+
+      isDraggingRef.current = true
+      setBoxSelecting(true)
+
+      const w = screenToWorld(e.clientX, e.clientY)
+      if (w) {
+        setBoxSelectStart(w)
+        setBoxSelectEnd(w)
       }
     }
 
-    const handleKeyUp = (e: KeyboardEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+
+      const w = screenToWorld(e.clientX, e.clientY)
+      if (w) setBoxSelectEnd(w)
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+
+      finishBoxSelect()
+      isDraggingRef.current = false
+      justFinishedRef.current = true
+    }
+
+    // 安全网：pointerdown 的 preventDefault 会抑制 mousedown→click，
+    // 但部分浏览器仍可能派发 click，这里兜底拦截防止 Ground.onClick 清空选中
+    const onClick = (e: MouseEvent) => {
+      if (justFinishedRef.current) {
+        e.stopImmediatePropagation()
+        e.preventDefault()
+        justFinishedRef.current = false
+      }
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') e.preventDefault()
+    }
+
+    const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt' && isDraggingRef.current) {
-        // 如果在拖拽时松开 Alt 键，取消框选
         setBoxSelecting(false)
         setBoxSelectStart(null)
         setBoxSelectEnd(null)
         isDraggingRef.current = false
-        startPosRef.current = null
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [setBoxSelecting, setBoxSelectStart, setBoxSelectEnd])
-
-  // 监听鼠标事件
-  useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      // 只在按住 Alt 键且按下左键时触发框选
-      if (!e.altKey || e.button !== 0) return
-
-      // 立即阻止默认行为和事件传播
-      e.preventDefault()
-      e.stopImmediatePropagation()
-      
-      isDraggingRef.current = true
-      hasMovedRef.current = false
-      startPosRef.current = new THREE.Vector2(e.clientX, e.clientY)
-      
-      // 立即禁用相机控制
-      setBoxSelecting(true)
-
-      // 转换为 3D 坐标
-      const pos3D = screenToGround(e.clientX, e.clientY)
-      if (pos3D) {
-        setBoxSelectStart([pos3D[0], pos3D[1]])
-        setBoxSelectEnd([pos3D[0], pos3D[1]])
-      }
-    }
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDraggingRef.current) return
-
-      // 阻止事件传播
-      e.preventDefault()
-      e.stopImmediatePropagation()
-
-      // 转换为 3D 坐标
-      const pos3D = screenToGround(e.clientX, e.clientY)
-      if (pos3D) {
-        setBoxSelectEnd([pos3D[0], pos3D[1]])
-      }
-    }
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (!isDraggingRef.current) return
-
-      e.preventDefault()
-      e.stopImmediatePropagation()
-      
-      const endPos3D = screenToGround(e.clientX, e.clientY)
-      
-      // 完成框选
-      if (endPos3D) {
-        finishBoxSelect(endPos3D)
-      } else {
-        setBoxSelecting(false)
-        setBoxSelectStart(null)
-        setBoxSelectEnd(null)
-      }
-      
-      isDraggingRef.current = false
-      startPosRef.current = null
-    }
-
-    // 使用捕获阶段监听，确保在 OrbitControls 之前拦截事件
-    window.addEventListener('mousedown', handleMouseDown, true)
-    window.addEventListener('mousemove', handleMouseMove, true)
-    window.addEventListener('mouseup', handleMouseUp, true)
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('pointermove', onPointerMove, true)
+    window.addEventListener('pointerup', onPointerUp, true)
+    window.addEventListener('click', onClick, true)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
 
     return () => {
-      window.removeEventListener('mousedown', handleMouseDown, true)
-      window.removeEventListener('mousemove', handleMouseMove, true)
-      window.removeEventListener('mouseup', handleMouseUp, true)
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('pointermove', onPointerMove, true)
+      window.removeEventListener('pointerup', onPointerUp, true)
+      window.removeEventListener('click', onClick, true)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
     }
-  }, [gl.domElement, screenToGround, finishBoxSelect, setBoxSelecting, setBoxSelectStart, setBoxSelectEnd])
+  }, [shouldActivate, finishBoxSelect, screenToWorld, setBoxSelecting, setBoxSelectStart, setBoxSelectEnd])
 
   return null
 }

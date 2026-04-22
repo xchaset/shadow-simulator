@@ -9,8 +9,11 @@ interface TerrainEditorProps {
 }
 
 /**
- * 地形编辑器 - 处理鼠标交互和顶点编辑
- * 不自带 mesh，通过 geometryRef 操作 Ground 中的几何体
+ * 地形编辑器
+ *
+ * 交互模式：Alt+左键 = 笔刷绘制，普通左键 = 正常旋转画布
+ * 绘制时通过 window capture 阶段拦截 pointer 事件，阻止 OrbitControls 接收。
+ * 笔刷光标始终跟随鼠标（不需要 Alt）。
  */
 export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProps) {
   const { camera, gl, raycaster } = useThree()
@@ -20,16 +23,14 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
   const terrainEditor = useStore(s => s.terrainEditor)
   const setTerrainEditor = useStore(s => s.setTerrainEditor)
-  const terrainData = useStore(s => s.terrainData)
   const canvasSize = useStore(s => s.canvasSize)
 
   // 初始化地形数据
   useEffect(() => {
-    if (!terrainData) {
-      const count = 128 * 128
+    if (!useStore.getState().terrainData) {
       useStore.getState().setTerrainData({
         resolution: 128,
-        heights: new Float32Array(count),
+        heights: new Float32Array(128 * 128),
         maxHeight: 50,
       })
     }
@@ -47,15 +48,11 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
   // 应用笔刷
   const applyBrush = useCallback((worldX: number, worldZ: number, isFirst: boolean) => {
-    console.log('[TerrainEditor] applyBrush called', { worldX, worldZ, isFirst })
     let data = useStore.getState().terrainData
-    console.log('[TerrainEditor] data before init:', data ? { resolution: data.resolution, heightsLength: data.heights?.length } : null)
     if (!data || !data.heights || data.heights.length === 0) {
-      console.log('[TerrainEditor] initializing terrainData')
-      const count = 128 * 128
       const newData = {
         resolution: 128,
-        heights: new Float32Array(count),
+        heights: new Float32Array(128 * 128),
         maxHeight: 50,
       }
       useStore.getState().setTerrainData(newData)
@@ -70,10 +67,8 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       useStore.getState().pushTerrainUndo()
     }
 
-    // 直接修改 heights 数组（因为 Float32Array 是可变对象）
     const heights = data.heights as Float32Array
     const resolution = data.resolution
-    console.log('[TerrainEditor] heights after init:', { length: heights.length, sample: heights[0] })
 
     for (let dy = -radiusInIndices; dy <= radiusInIndices; dy++) {
       for (let dx = -radiusInIndices; dx <= radiusInIndices; dx++) {
@@ -124,10 +119,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
     // 更新几何体顶点
     const geometry = geometryRef.current
-    console.log('[TerrainEditor] geometry:', geometry)
     if (geometry) {
-      console.log('[TerrainEditor] position count:', geometry.attributes.position.count)
-      console.log('[TerrainEditor] sample heights before:', heights[0], heights[100], heights[1000])
       const pos = geometry.attributes.position
       for (let i = 0; i < resolution; i++) {
         for (let j = 0; j < resolution; j++) {
@@ -136,97 +128,123 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       }
       pos.needsUpdate = true
       geometry.computeVertexNormals()
-      console.log('[TerrainEditor] mesh updated, sample pos:', pos.getZ(0), pos.getZ(100), pos.getZ(1000))
     }
 
-    // 更新 store 中的 terrainData
     useStore.getState().setTerrainData({
       resolution: data.resolution,
       heights: data.heights,
       maxHeight: data.maxHeight,
     })
-    console.log('[TerrainEditor] terrainData updated in store')
 
     onHeightChange()
   }, [canvasSize, worldToIndex, geometryRef, onHeightChange])
 
-  // 射线检测
-  const getWorldPosition = useCallback((event: PointerEvent): [number, number] | null => {
+  // 射线检测 → 世界坐标
+  const getWorldPosition = useCallback((event: { clientX: number; clientY: number }): [number, number] | null => {
     const rect = gl.domElement.getBoundingClientRect()
     const mouse = {
       x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
       y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
     }
-
     raycaster.setFromCamera(mouse, cameraRef.current)
-
-    const groundPlane = new Plane(new Vector3(0, 1, 0), 0)
     const hit = new Vector3()
-    raycaster.ray.intersectPlane(groundPlane, hit)
-
-    return hit ? [hit.x, hit.z] : null
+    if (raycaster.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), hit)) {
+      return [hit.x, hit.z]
+    }
+    return null
   }, [gl, raycaster])
 
-  const handlePointerDown = useCallback((e: PointerEvent) => {
-    console.log('[TerrainEditor] handlePointerDown called', { enabled: terrainEditor.enabled, button: e.button })
-    if (!terrainEditor.enabled || e.button !== 0) return
-    e.preventDefault()
-    isDrawingRef.current = true
-    setTerrainEditor({ isDrawing: true })
+  // ── 绘制事件（window capture 阶段，Alt+左键触发）──────────
 
-    const pos = getWorldPosition(e)
-    if (pos) {
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      if (!terrainEditor.enabled || !e.altKey || e.button !== 0) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+
+      isDrawingRef.current = true
+      setTerrainEditor({ isDrawing: true })
+
+      const pos = getWorldPosition(e)
+      if (pos) {
+        lastPosRef.current = pos
+        applyBrush(pos[0], pos[1], true)
+      }
+    }
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDrawingRef.current) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+
+      const pos = getWorldPosition(e)
+      if (!pos) return
+
+      // 插值绘制，避免快速移动时出现断点
+      if (lastPosRef.current) {
+        const [lx, lz] = lastPosRef.current
+        const [nx, nz] = pos
+        const dist = Math.sqrt((nx - lx) ** 2 + (nz - lz) ** 2)
+        const brushRadius = useStore.getState().terrainEditor.brushRadius
+        const steps = Math.max(1, Math.floor(dist / (brushRadius * 0.3)))
+
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps
+          applyBrush(lx + (nx - lx) * t, lz + (nz - lz) * t, false)
+        }
+      } else {
+        applyBrush(pos[0], pos[1], false)
+      }
       lastPosRef.current = pos
-      applyBrush(pos[0], pos[1], true)
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (!isDrawingRef.current) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+
+      isDrawingRef.current = false
+      lastPosRef.current = null
+      setTerrainEditor({ isDrawing: false })
+    }
+
+    // Alt 释放时停止绘制
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' && isDrawingRef.current) {
+        isDrawingRef.current = false
+        lastPosRef.current = null
+        setTerrainEditor({ isDrawing: false })
+      }
+    }
+
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('pointermove', onPointerMove, true)
+    window.addEventListener('pointerup', onPointerUp, true)
+    window.addEventListener('keyup', onKeyUp)
+
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('pointermove', onPointerMove, true)
+      window.removeEventListener('pointerup', onPointerUp, true)
+      window.removeEventListener('keyup', onKeyUp)
     }
   }, [terrainEditor.enabled, getWorldPosition, applyBrush, setTerrainEditor])
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-    const pos = getWorldPosition(e)
-    setTerrainEditor({ brushPosition: pos })
-
-    if (!isDrawingRef.current || !pos) return
-
-    if (lastPosRef.current) {
-      const [lx, lz] = lastPosRef.current
-      const [nx, nz] = pos
-      const dist = Math.sqrt((nx - lx) ** 2 + (nz - lz) ** 2)
-      const steps = Math.max(1, Math.floor(dist / (terrainEditor.brushRadius * 0.3)))
-
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps
-        const ix = lx + (nx - lx) * t
-        const iz = lz + (nz - lz) * t
-        applyBrush(ix, iz, i === 0)
-      }
-    } else {
-      applyBrush(pos[0], pos[1], true)
-    }
-    lastPosRef.current = pos
-  }, [getWorldPosition, applyBrush, terrainEditor.brushRadius, setTerrainEditor])
-
-  const handlePointerUp = useCallback(() => {
-    isDrawingRef.current = false
-    lastPosRef.current = null
-    setTerrainEditor({ isDrawing: false })
-  }, [setTerrainEditor])
+  // ── 笔刷位置跟踪（canvas 级别，始终生效）──────────
 
   useEffect(() => {
     const canvas = gl.domElement
-    canvas.addEventListener('pointerdown', handlePointerDown)
-    canvas.addEventListener('pointermove', handlePointerMove)
-    canvas.addEventListener('pointerup', handlePointerUp)
-    canvas.addEventListener('pointerleave', handlePointerUp)
-
-    return () => {
-      canvas.removeEventListener('pointerdown', handlePointerDown)
-      canvas.removeEventListener('pointermove', handlePointerMove)
-      canvas.removeEventListener('pointerup', handlePointerUp)
-      canvas.removeEventListener('pointerleave', handlePointerUp)
+    const onMove = (e: PointerEvent) => {
+      if (isDrawingRef.current) return // 绘制中由 capture handler 处理
+      const pos = getWorldPosition(e)
+      setTerrainEditor({ brushPosition: pos })
     }
-  }, [gl.domElement, handlePointerDown, handlePointerMove, handlePointerUp])
+    canvas.addEventListener('pointermove', onMove)
+    return () => canvas.removeEventListener('pointermove', onMove)
+  }, [gl.domElement, getWorldPosition, setTerrainEditor])
 
-  // 笔刷光标
+  // ── 笔刷光标渲染 ──────────
+
   useFrame(() => {
     const brushIndicator = document.getElementById('terrain-brush-indicator')
     const { brushPosition, brushRadius, enabled } = useStore.getState().terrainEditor

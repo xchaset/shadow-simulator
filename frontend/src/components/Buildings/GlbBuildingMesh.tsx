@@ -77,10 +77,10 @@ export function GlbBuildingMesh({ building }: Props) {
     return meshes
   }, [isSelectedVisual, scene])
 
+  // 单击 → 单选；Ctrl+单击 → 切换选中
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    // 如果按住 Alt 键，切换选择；否则单选
-    if (e.altKey) {
+    if (e.ctrlKey || e.metaKey) {
       toggleBuildingSelection(building.id)
     } else {
       selectBuilding(building.id)

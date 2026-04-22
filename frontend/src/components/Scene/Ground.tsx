@@ -20,18 +20,13 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
 
   // 更新地形高度
   useEffect(() => {
-    console.log('[Ground] effect run', { terrainData: !!terrainData, hasTerrain })
     if (!terrainData || !hasTerrain) return
     const mesh = meshRef.current
-    if (!mesh) {
-      console.log('[Ground] mesh not ready')
-      return
-    }
+    if (!mesh) return
 
     const geometry = mesh.geometry
     const pos = geometry.attributes.position
     const { heights, resolution } = terrainData
-    console.log('[Ground] updating mesh', { resolution, heightsLength: heights.length, posCount: pos.count })
 
     for (let i = 0; i < resolution; i++) {
       for (let j = 0; j < resolution; j++) {
@@ -40,7 +35,6 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
     }
     pos.needsUpdate = true
     geometry.computeVertexNormals()
-    console.log('[Ground] mesh updated')
   }, [terrainData, hasTerrain])
 
   return (
@@ -58,7 +52,6 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
         />
         <meshStandardMaterial
           color={hasTerrain ? '#8B7355' : '#e8e8e8'}
-          wireframe={!hasTerrain}
         />
       </mesh>
       {showGrid && !hasTerrain && (
