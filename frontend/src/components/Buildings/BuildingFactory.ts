@@ -124,6 +124,8 @@ export function createBuildingGeometries(
       }
       return [trunk, canopy]
     }
+    case 'river':
+      return createRiverGeometries(p)
     case 'ai-circular':
       return createAICircularGeometries(p)
     case 'ai-complex':
@@ -282,4 +284,71 @@ function createAIComplexGeometries(p: Record<string, number>): GeometryItem[] {
   }
 
   return items
+}
+
+// ─── 河流（弯曲河道）─────────────────────────────────────
+
+function createRiverGeometries(p: Record<string, number>): GeometryItem[] {
+  const length = p.length || 120
+  const width = p.width || 10
+  const curvature = p.curvature || 30
+  const lengthSegs = Math.max(16, Math.floor(p.segments || 48))
+  const widthSegs = Math.max(6, Math.floor(width / 2))  // 横向细分
+
+  // 用 CatmullRom 曲线生成河流中心线
+  const halfLen = length / 2
+  const ctrlPoints = [
+    new THREE.Vector3(0, 0, -halfLen),
+    new THREE.Vector3(curvature * 0.5, 0, -halfLen * 0.33),
+    new THREE.Vector3(-curvature * 0.5, 0, halfLen * 0.33),
+    new THREE.Vector3(0, 0, halfLen),
+  ]
+  const curve = new THREE.CatmullRomCurve3(ctrlPoints)
+
+  const curvePoints = curve.getSpacedPoints(lengthSegs)
+  const tangents = curvePoints.map((_, i) => curve.getTangentAt(i / lengthSegs))
+
+  const halfW = width / 2
+  const VPS = widthSegs + 1  // 每个截面的顶点数
+  const vertices: number[] = []
+  const indices: number[] = []
+  const uvs: number[] = []
+
+  for (let i = 0; i <= lengthSegs; i++) {
+    const pt = curvePoints[i]
+    const tan = tangents[i]
+    const right = new THREE.Vector3(-tan.z, 0, tan.x).normalize()
+    const v = i / lengthSegs
+
+    for (let j = 0; j <= widthSegs; j++) {
+      const u = j / widthSegs
+      const offset = (u - 0.5) * 2 * halfW  // -halfW ~ +halfW
+      vertices.push(
+        pt.x + right.x * offset,
+        0,
+        pt.z + right.z * offset,
+      )
+      uvs.push(u, v)
+    }
+  }
+
+  // 连接网格
+  for (let i = 0; i < lengthSegs; i++) {
+    for (let j = 0; j < widthSegs; j++) {
+      const a = i * VPS + j
+      const b = a + 1
+      const c = (i + 1) * VPS + j + 1
+      const d = (i + 1) * VPS + j
+      indices.push(a, d, b, b, d, c)
+    }
+  }
+
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geom.setIndex(indices)
+  geom.computeVertexNormals()
+
+  // 略高于地面，避免 z-fighting
+  return [{ geometry: geom, position: [0, 0.15, 0] }]
 }

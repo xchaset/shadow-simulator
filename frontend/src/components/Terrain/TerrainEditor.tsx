@@ -8,12 +8,23 @@ interface TerrainEditorProps {
   onHeightChange: () => void
 }
 
+// ── 对象池：避免拖动时高频 GC ──────────
+const _hitVec = new Vector3()
+const _groundPlane = new Plane(new Vector3(0, 1, 0), 0)
+const _screenVec = new Vector3()
+
 /**
  * 地形编辑器
  *
  * 交互模式：Alt+左键 = 笔刷绘制，普通左键 = 正常旋转画布
  * 绘制时通过 window capture 阶段拦截 pointer 事件，阻止 OrbitControls 接收。
  * 笔刷光标始终跟随鼠标（不需要 Alt）。
+ *
+ * 性能优化：
+ * - 局部顶点更新：只更新笔刷影响范围内的顶点
+ * - RAF 批处理：多次 applyBrush 合并为一帧更新
+ * - 延迟法线计算：拖动中跳过 computeVertexNormals，结束时算一次
+ * - ref 直接操作：拖动中不触发 React 重渲染
  */
 export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProps) {
   const { camera, gl, raycaster } = useThree()
@@ -24,6 +35,14 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
   const terrainEditor = useStore(s => s.terrainEditor)
   const setTerrainEditor = useStore(s => s.setTerrainEditor)
   const canvasSize = useStore(s => s.canvasSize)
+
+  // ── 批处理状态 ──────────
+  const rafIdRef = useRef<number>(0)
+  // 脏区域边界 [minX, minY, maxX, maxY]，用于局部顶点更新
+  const dirtyBoundsRef = useRef<[number, number, number, number]>([Infinity, Infinity, -Infinity, -Infinity])
+  // 拖动中直接引用 heights，不走 state
+  const heightsRef = useRef<Float32Array | null>(null)
+  const resolutionRef = useRef(128)
 
   // 初始化地形数据
   useEffect(() => {
@@ -46,7 +65,52 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     return [Math.max(0, Math.min(127, x)), Math.max(0, Math.min(127, y))]
   }, [canvasSize])
 
-  // 应用笔刷
+  // 扩展脏区域
+  const expandDirtyBounds = useCallback((cx: number, cy: number, radius: number) => {
+    const b = dirtyBoundsRef.current
+    b[0] = Math.min(b[0], cx - radius)
+    b[1] = Math.min(b[1], cy - radius)
+    b[2] = Math.max(b[2], cx + radius)
+    b[3] = Math.max(b[3], cy + radius)
+  }, [])
+
+  // 刷新几何体：只更新脏区域内的顶点
+  const flushGeometry = useCallback(() => {
+    const geometry = geometryRef.current
+    const heights = heightsRef.current
+    if (!geometry || !heights) return
+
+    const [minX, minY, maxX, maxY] = dirtyBoundsRef.current
+    const res = resolutionRef.current
+    const pos = geometry.attributes.position
+
+    const x0 = Math.max(0, Math.floor(minX))
+    const y0 = Math.max(0, Math.floor(minY))
+    const x1 = Math.min(res - 1, Math.ceil(maxX))
+    const y1 = Math.min(res - 1, Math.ceil(maxY))
+
+    for (let iy = y0; iy <= y1; iy++) {
+      for (let ix = x0; ix <= x1; ix++) {
+        const idx = iy * res + ix
+        pos.setZ(idx, heights[idx])
+      }
+    }
+    pos.needsUpdate = true
+
+    // 重置脏区域
+    dirtyBoundsRef.current = [Infinity, Infinity, -Infinity, -Infinity]
+  }, [geometryRef])
+
+  // 调度 RAF 批量更新
+  const scheduleFlush = useCallback(() => {
+    if (rafIdRef.current) return
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = 0
+      flushGeometry()
+    })
+  }, [flushGeometry])
+
+  // 应用笔刷（只修改 heights 数据 + 标记脏区域，不直接操作几何体）
   const applyBrush = useCallback((worldX: number, worldZ: number, isFirst: boolean) => {
     let data = useStore.getState().terrainData
     if (!data || !data.heights || data.heights.length === 0) {
@@ -65,10 +129,13 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
     if (isFirst) {
       useStore.getState().pushTerrainUndo()
+      // 拖动开始：缓存引用，后续直接操作
+      heightsRef.current = data.heights as Float32Array
+      resolutionRef.current = data.resolution
     }
 
-    const heights = data.heights as Float32Array
-    const resolution = data.resolution
+    const heights = heightsRef.current || data.heights as Float32Array
+    const resolution = resolutionRef.current || data.resolution
 
     for (let dy = -radiusInIndices; dy <= radiusInIndices; dy++) {
       for (let dx = -radiusInIndices; dx <= radiusInIndices; dx++) {
@@ -117,29 +184,41 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       }
     }
 
-    // 更新几何体顶点
+    // 标记脏区域，调度批量更新
+    expandDirtyBounds(cx, cy, radiusInIndices)
+    scheduleFlush()
+  }, [canvasSize, worldToIndex, expandDirtyBounds, scheduleFlush])
+
+  // 拖动结束：计算法线 + 同步 state（一次性）
+  const finishDrawing = useCallback(() => {
+    // 确保最后一批脏数据刷入几何体
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = 0
+    }
+    flushGeometry()
+
+    // 拖动结束才计算法线（最昂贵的操作，只做一次）
     const geometry = geometryRef.current
     if (geometry) {
-      const pos = geometry.attributes.position
-      for (let i = 0; i < resolution; i++) {
-        for (let j = 0; j < resolution; j++) {
-          pos.setZ(i * resolution + j, heights[i * resolution + j])
-        }
-      }
-      pos.needsUpdate = true
       geometry.computeVertexNormals()
     }
 
-    useStore.getState().setTerrainData({
-      resolution: data.resolution,
-      heights: data.heights,
-      maxHeight: data.maxHeight,
-    })
+    // 同步到 store（触发一次 React 更新，用于持久化/undo 等）
+    const data = useStore.getState().terrainData
+    if (data) {
+      useStore.getState().setTerrainData({
+        resolution: data.resolution,
+        heights: data.heights,
+        maxHeight: data.maxHeight,
+      })
+    }
 
+    heightsRef.current = null
     onHeightChange()
-  }, [canvasSize, worldToIndex, geometryRef, onHeightChange])
+  }, [flushGeometry, geometryRef, onHeightChange])
 
-  // 射线检测 → 世界坐标
+  // 射线检测 → 世界坐标（使用对象池）
   const getWorldPosition = useCallback((event: { clientX: number; clientY: number }): [number, number] | null => {
     const rect = gl.domElement.getBoundingClientRect()
     const mouse = {
@@ -147,9 +226,8 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
     }
     raycaster.setFromCamera(mouse, cameraRef.current)
-    const hit = new Vector3()
-    if (raycaster.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), hit)) {
-      return [hit.x, hit.z]
+    if (raycaster.ray.intersectPlane(_groundPlane, _hitVec)) {
+      return [_hitVec.x, _hitVec.z]
     }
     return null
   }, [gl, raycaster])
@@ -206,6 +284,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       isDrawingRef.current = false
       lastPosRef.current = null
       setTerrainEditor({ isDrawing: false })
+      finishDrawing()
     }
 
     // Alt 释放时停止绘制
@@ -214,6 +293,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
         isDrawingRef.current = false
         lastPosRef.current = null
         setTerrainEditor({ isDrawing: false })
+        finishDrawing()
       }
     }
 
@@ -227,8 +307,13 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       window.removeEventListener('pointermove', onPointerMove, true)
       window.removeEventListener('pointerup', onPointerUp, true)
       window.removeEventListener('keyup', onKeyUp)
+      // 清理未执行的 RAF
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = 0
+      }
     }
-  }, [terrainEditor.enabled, getWorldPosition, applyBrush, setTerrainEditor])
+  }, [terrainEditor.enabled, getWorldPosition, applyBrush, setTerrainEditor, finishDrawing])
 
   // ── 笔刷位置跟踪（canvas 级别，始终生效）──────────
 
@@ -255,12 +340,12 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     }
 
     if (brushIndicator) {
-      const worldPos = new Vector3(brushPosition[0], 0, brushPosition[1])
-      const screenPos = worldPos.project(camera)
+      _screenVec.set(brushPosition[0], 0, brushPosition[1])
+      _screenVec.project(camera)
       const rect = gl.domElement.getBoundingClientRect()
 
-      const x = (screenPos.x * 0.5 + 0.5) * rect.width + rect.left
-      const y = (-screenPos.y * 0.5 + 0.5) * rect.height + rect.top
+      const x = (_screenVec.x * 0.5 + 0.5) * rect.width + rect.left
+      const y = (-_screenVec.y * 0.5 + 0.5) * rect.height + rect.top
       const pixelRadius = (brushRadius / canvasSize) * Math.min(rect.width, rect.height)
 
       brushIndicator.style.display = 'block'

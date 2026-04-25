@@ -11,30 +11,27 @@ interface Props {
 
 export function BuildingMesh({ building }: Props) {
   const groupRef = useRef<THREE.Group>(null)
-  const selectedId = useStore(s => s.selectedBuildingId)
-  const selectedIds = useStore(s => s.selectedBuildingIds)
 
-  // DEBUG
-  console.log('[BuildingMesh] render:', building.id, {
-    selectedIds,
-    selectedIdsJson: JSON.stringify(selectedIds),
-    buildingId: building.id,
-    includes: selectedIds.includes(building.id)
-  })
+  // 只订阅"自己是否被选中"的布尔值，避免其他建筑选中时触发重渲染
+  const isSelected = useStore(s => s.selectedBuildingId === building.id)
+  const isMultiSelected = useStore(s => s.selectedBuildingIds.includes(building.id))
+  const isSelectedVisual = isSelected || isMultiSelected
 
   const selectBuilding = useStore(s => s.selectBuilding)
   const toggleBuildingSelection = useStore(s => s.toggleBuildingSelection)
   const setEditorOpen = useStore(s => s.setEditorOpen)
-  const isSelected = selectedId === building.id
-  const isMultiSelected = selectedIds.includes(building.id)
-  const isSelectedVisual = isSelected || isMultiSelected
 
   const geometries = useMemo(
     () => createBuildingGeometries(building.type, building.params),
     [building.type, building.params],
   )
 
-  // 单击 → 单选；Ctrl+单击 → 切换选中
+  // 缓存 EdgesGeometry，只在 geometries 变化时重建
+  const edgesGeometries = useMemo(
+    () => geometries.map(item => new THREE.EdgesGeometry(item.geometry)),
+    [geometries],
+  )
+
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
     if (e.ctrlKey || e.metaKey) {
@@ -44,7 +41,6 @@ export function BuildingMesh({ building }: Props) {
     }
   }, [building.id, selectBuilding, toggleBuildingSelection])
 
-  // 双击 → 打开编辑面板
   const handleDoubleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
     selectBuilding(building.id)
@@ -75,10 +71,12 @@ export function BuildingMesh({ building }: Props) {
             }
             transparent={isSelectedVisual}
             opacity={isSelectedVisual ? 0.85 : 1}
+            roughness={1}
+            metalness={0}
           />
           {isSelectedVisual && (
             <lineSegments>
-              <edgesGeometry args={[item.geometry]} />
+              <primitive object={edgesGeometries[i]} attach="geometry" />
               <lineBasicMaterial color={isMultiSelected ? "#52c41a" : "#ffffff"} linewidth={2} />
             </lineSegments>
           )}

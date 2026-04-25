@@ -19,8 +19,11 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
   const hasTerrain = terrainData && terrainEditor.enabled
 
   // 更新地形高度
+  // 绘制中由 TerrainEditor 直接操作几何体（局部更新 + RAF 批处理），
+  // 此处仅处理非绘制场景：undo/redo、加载场景、清除地貌等
   useEffect(() => {
     if (!terrainData || !hasTerrain) return
+    if (terrainEditor.isDrawing) return
     const mesh = meshRef.current
     if (!mesh) return
 
@@ -35,7 +38,7 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
     }
     pos.needsUpdate = true
     geometry.computeVertexNormals()
-  }, [terrainData, hasTerrain])
+  }, [terrainData, hasTerrain, terrainEditor.isDrawing])
 
   return (
     <group>

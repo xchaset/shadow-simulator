@@ -20,19 +20,23 @@ export function BoxSelectInteraction() {
   const setBoxSelectStart = useStore(s => s.setBoxSelectStart)
   const setBoxSelectEnd = useStore(s => s.setBoxSelectEnd)
 
+  // 复用临时对象，避免拖拽时每帧分配
+  const tmpNdc = useRef(new THREE.Vector2())
+  const tmpRaycaster = useRef(new THREE.Raycaster())
+  const tmpHit = useRef(new THREE.Vector3())
+  const groundPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0))
+
   // 屏幕坐标 → 世界坐标（射线与 y=0 平面求交）
   const screenToWorld = useCallback(
     (screenX: number, screenY: number): [number, number] | null => {
       const rect = gl.domElement.getBoundingClientRect()
-      const ndc = new THREE.Vector2(
+      tmpNdc.current.set(
         ((screenX - rect.left) / rect.width) * 2 - 1,
         -((screenY - rect.top) / rect.height) * 2 + 1,
       )
-      const raycaster = new THREE.Raycaster()
-      raycaster.setFromCamera(ndc, camera)
-      const hit = new THREE.Vector3()
-      if (raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) {
-        return [hit.x, hit.z]
+      tmpRaycaster.current.setFromCamera(tmpNdc.current, camera)
+      if (tmpRaycaster.current.ray.intersectPlane(groundPlane.current, tmpHit.current)) {
+        return [tmpHit.current.x, tmpHit.current.z]
       }
       return null
     },

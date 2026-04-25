@@ -1,6 +1,6 @@
 import { useRef, useCallback, useMemo, useState, useEffect } from 'react'
 import * as THREE from 'three'
-import { useLoader, ThreeEvent } from '@react-three/fiber'
+import { ThreeEvent } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { useStore } from '../../store/useStore'
@@ -16,14 +16,15 @@ interface Props {
 
 export function GlbBuildingMesh({ building }: Props) {
   const groupRef = useRef<THREE.Group>(null)
-  const selectedId = useStore(s => s.selectedBuildingId)
-  const selectedIds = useStore(s => s.selectedBuildingIds)
+
+  // 只订阅"自己是否被选中"的布尔值
+  const isSelected = useStore(s => s.selectedBuildingId === building.id)
+  const isMultiSelected = useStore(s => s.selectedBuildingIds.includes(building.id))
+  const isSelectedVisual = isSelected || isMultiSelected
+
   const selectBuilding = useStore(s => s.selectBuilding)
   const toggleBuildingSelection = useStore(s => s.toggleBuildingSelection)
   const setEditorOpen = useStore(s => s.setEditorOpen)
-  const isSelected = selectedId === building.id
-  const isMultiSelected = selectedIds.includes(building.id)
-  const isSelectedVisual = isSelected || isMultiSelected
 
   const [loadError, setLoadError] = useState(false)
   const [scene, setScene] = useState<THREE.Group | null>(null)
@@ -45,15 +46,12 @@ export function GlbBuildingMesh({ building }: Props) {
       glbUrl,
       (gltf) => {
         const model = gltf.scene.clone()
-
-        // 启用阴影
         model.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             child.castShadow = true
             child.receiveShadow = true
           }
         })
-
         setScene(model)
         setLoadError(false)
       },
@@ -65,19 +63,24 @@ export function GlbBuildingMesh({ building }: Props) {
     )
   }, [glbUrl])
 
-  // 选中时的高亮边框
-  const outlineMeshes = useMemo(() => {
-    if (!isSelectedVisual || !scene) return []
-    const meshes: THREE.Mesh[] = []
+  // 缓存选中时的高亮边框几何体
+  const outlineData = useMemo(() => {
+    if (!scene) return []
+    const data: { edges: THREE.EdgesGeometry; position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }[] = []
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        meshes.push(child as THREE.Mesh)
+        const mesh = child as THREE.Mesh
+        data.push({
+          edges: new THREE.EdgesGeometry(mesh.geometry),
+          position: mesh.position.clone(),
+          rotation: mesh.rotation.clone(),
+          scale: mesh.scale.clone(),
+        })
       }
     })
-    return meshes
-  }, [isSelectedVisual, scene])
+    return data
+  }, [scene])
 
-  // 单击 → 单选；Ctrl+单击 → 切换选中
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
     if (e.ctrlKey || e.metaKey) {
@@ -125,10 +128,9 @@ export function GlbBuildingMesh({ building }: Props) {
       onDoubleClick={handleDoubleClick}
     >
       <primitive object={scene} />
-      {/* 选中高亮 */}
-      {isSelectedVisual && outlineMeshes.map((mesh, i) => (
-        <lineSegments key={i} position={mesh.position} rotation={mesh.rotation} scale={mesh.scale}>
-          <edgesGeometry args={[mesh.geometry]} />
+      {isSelectedVisual && outlineData.map((item, i) => (
+        <lineSegments key={i} position={item.position} rotation={item.rotation} scale={item.scale}>
+          <primitive object={item.edges} attach="geometry" />
           <lineBasicMaterial color={isMultiSelected ? "#52c41a" : "#ffffff"} linewidth={2} />
         </lineSegments>
       ))}

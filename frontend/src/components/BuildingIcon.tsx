@@ -15,6 +15,7 @@ import {
   RadarChartOutlined,
   AppstoreOutlined,
   FileOutlined,
+  SlackOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
@@ -35,6 +36,7 @@ const ICON_MAP: Record<string, ReactNode> = {
   RadarChartOutlined: <RadarChartOutlined />,
   AppstoreOutlined: <AppstoreOutlined />,
   FileOutlined: <FileOutlined />,
+  SlackOutlined: <SlackOutlined />,
 }
 
 export function BuildingIcon({ name }: { name: string }) {

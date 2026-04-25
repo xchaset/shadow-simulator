@@ -14,6 +14,7 @@ export type BuildingType =
   | 'tree'
   | 'ai-circular'
   | 'ai-complex'
+  | 'river'
   | 'glb'
 
 export interface Building {

@@ -90,6 +90,13 @@ export const BUILDING_PRESETS: Record<BuildingType, BuildingPreset> = {
     paramLabels: { trunkHeight: '树干高', trunkRadius: '树干半径', canopyRadius: '树冠半径', canopyHeight: '树冠高' },
     defaultColor: '#2E7D32',
   },
+  river: {
+    label: '河流',
+    icon: 'SlackOutlined',
+    defaultParams: { length: 120, width: 10, depth: 3, curvature: 30, segments: 32 },
+    paramLabels: { length: '长度', width: '宽度', depth: '深度', curvature: '弯曲度', segments: '分段数' },
+    defaultColor: '#3B82C4',
+  },
   'ai-circular': {
     label: 'AI 圆形建筑',
     icon: 'RadarChartOutlined',
