@@ -1,18 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Button, Input, Tree, Dropdown, Modal, message, Tooltip, Empty, Spin, Select,
+  Button, Input, Tree, Dropdown, Modal, message, Tooltip, Empty, Spin, Select, Upload, Descriptions,
 } from 'antd'
 import type { InputRef } from 'antd'
 import {
   FolderOutlined, FolderOpenOutlined, FileOutlined,
   PlusOutlined, SaveOutlined, DeleteOutlined, EditOutlined,
   ExclamationCircleOutlined, FolderAddOutlined,
-  CopyOutlined, DragOutlined,
+  CopyOutlined, DragOutlined, ExportOutlined, ImportOutlined,
+  InboxOutlined, CheckOutlined, ReloadOutlined,
 } from '@ant-design/icons'
 import type { TreeDataNode } from 'antd'
 import { useStore } from '../../store/useStore'
 import { directoryApi, modelApi, recentModelApi } from '../../utils/api'
-import { loadState, saveState } from '../../utils/storage'
+import { saveState } from '../../utils/storage'
+import {
+  exportModel,
+  exportDirectory,
+  readImportFile,
+  prepareExportData,
+  isDirectoryImportData,
+  type ImportedModelData,
+  type ImportedDirectoryData,
+  type ImportedData,
+  type ExportedModel,
+} from '../../utils/exportImport'
 import type { Directory, Model } from '../../types'
 import { TerrainToolbar } from '../Terrain/TerrainToolbar'
 
@@ -37,7 +49,7 @@ export function ProjectSidebar() {
   const [renaming, setRenaming] = useState<{ type: 'dir' | 'model'; id: string } | null>(null)
   const renameInputRef = useRef<InputRef>(null)
   const composingRef = useRef(false)
-  const renameTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const renameTimeoutRef = useRef<number | null>(null)
 
   // Move modal state
   const [moveModal, setMoveModal] = useState<{ type: 'model'; id: string; currentDirId: string } | null>(null)
@@ -46,6 +58,21 @@ export function ProjectSidebar() {
   // Recent models
   const [recentModels, setRecentModels] = useState<Model[]>([])
   const [recentLoading, setRecentLoading] = useState(true)
+
+  // Import modal state
+  const [importModal, setImportModal] = useState<{
+    open: boolean
+    file: File | null
+    parsed: ImportedData | null
+    loading: boolean
+    targetDirId: string | null
+  }>({
+    open: false,
+    file: null,
+    parsed: null,
+    loading: false,
+    targetDirId: null,
+  })
 
   // 加载最近打开的模型详情
   const loadRecentModels = useCallback(async () => {
@@ -324,6 +351,214 @@ export function ProjectSidebar() {
     }
   }
 
+  // ─── Export / Import ───────────────────────────────────
+
+  const handleExportModel = useCallback(async (model: Model) => {
+    try {
+      let fullModel: Model = model
+
+      if (!model.scene_data || model.scene_data.length === 0) {
+        fullModel = await modelApi.get(model.id)
+      }
+
+      const { terrainData, canvasSize, showGrid, gridDivisions } = useStore.getState()
+
+      exportModel(
+        {
+          name: fullModel.name,
+          description: fullModel.description || '',
+          location_lat: fullModel.location_lat,
+          location_lng: fullModel.location_lng,
+          city_name: fullModel.city_name,
+          date_time: fullModel.date_time,
+          scene_data: fullModel.scene_data || [],
+        },
+        terrainData,
+        canvasSize,
+        showGrid,
+        gridDivisions
+      )
+
+      message.success('模型已导出')
+    } catch (err: any) {
+      message.error('导出失败: ' + err.message)
+    }
+  }, [])
+
+  const handleExportDirectory = useCallback(async (dir: Directory) => {
+    try {
+      const dirModels = models[dir.id] || []
+
+      if (dirModels.length === 0) {
+        message.warning('该目录没有模型，无需导出')
+        return
+      }
+
+      const exportedModels: ExportedModel[] = []
+
+      for (const model of dirModels) {
+        let fullModel: Model = model
+
+        if (!model.scene_data || model.scene_data.length === 0) {
+          fullModel = await modelApi.get(model.id)
+        }
+
+        const exported = prepareExportData(
+          {
+            name: fullModel.name,
+            description: fullModel.description || '',
+            location_lat: fullModel.location_lat,
+            location_lng: fullModel.location_lng,
+            city_name: fullModel.city_name,
+            date_time: fullModel.date_time,
+            scene_data: fullModel.scene_data || [],
+            canvas_size: fullModel.canvas_size,
+            show_grid: fullModel.show_grid,
+            grid_divisions: fullModel.grid_divisions,
+          },
+          fullModel.terrain_data,
+          fullModel.canvas_size,
+          fullModel.show_grid,
+          fullModel.grid_divisions
+        )
+
+        exportedModels.push(exported)
+      }
+
+      exportDirectory(dir.name, dir.description || '', exportedModels)
+      message.success(`已导出目录「${dir.name}」，包含 ${exportedModels.length} 个模型`)
+    } catch (err: any) {
+      message.error('导出目录失败: ' + err.message)
+    }
+  }, [models])
+
+  const handleOpenImportModal = () => {
+    setImportModal({
+      open: true,
+      file: null,
+      parsed: null,
+      loading: false,
+      targetDirId: currentDirectoryId || directories[0]?.id || null,
+    })
+  }
+
+  const handleCloseImportModal = () => {
+    setImportModal({
+      open: false,
+      file: null,
+      parsed: null,
+      loading: false,
+      targetDirId: null,
+    })
+  }
+
+  const handleImportFileSelect = async (file: File) => {
+    if (!file.name.endsWith('.json')) {
+      message.error('请上传 .json 文件')
+      return false
+    }
+
+    setImportModal(prev => ({ ...prev, loading: true, parsed: null }))
+
+    try {
+      const parsed = await readImportFile(file)
+      setImportModal(prev => ({
+        ...prev,
+        file,
+        parsed,
+        loading: false,
+      }))
+      message.success('文件解析成功')
+    } catch (err: any) {
+      message.error('文件解析失败: ' + err.message)
+      setImportModal(prev => ({ ...prev, loading: false }))
+    }
+
+    return false
+  }
+
+  const handleImportSingleModel = async (modelData: ImportedModelData, targetDirId: string, loadAfterImport = false) => {
+    const newModel = await modelApi.create(targetDirId, {
+      name: modelData.name,
+      description: modelData.description,
+      location_lat: modelData.location_lat,
+      location_lng: modelData.location_lng,
+      city_name: modelData.city_name,
+      date_time: modelData.date_time,
+      scene_data: modelData.scene_data,
+    })
+
+    if (modelData.terrain_data ||
+        modelData.canvas_size !== undefined ||
+        modelData.show_grid !== undefined ||
+        modelData.grid_divisions !== undefined) {
+      await modelApi.update(newModel.id, {
+        canvas_size: modelData.canvas_size,
+        show_grid: modelData.show_grid,
+        grid_divisions: modelData.grid_divisions,
+        terrain_data: modelData.terrain_data,
+      })
+    }
+
+    if (loadAfterImport) {
+      const updatedModel = await modelApi.get(newModel.id)
+      loadSceneFromModel(updatedModel)
+    }
+
+    return newModel
+  }
+
+  const handleImportConfirm = async () => {
+    if (!importModal.parsed) {
+      message.warning('请先选择文件')
+      return
+    }
+
+    try {
+      if (isDirectoryImportData(importModal.parsed)) {
+        const dirData = importModal.parsed as ImportedDirectoryData
+
+        const newDir = await directoryApi.create(
+          dirData.name,
+          dirData.description || ''
+        )
+
+        let importedCount = 0
+        for (const modelData of dirData.models) {
+          try {
+            await handleImportSingleModel(modelData, newDir.id, false)
+            importedCount++
+          } catch (err: any) {
+            console.error(`导入模型「${modelData.name}」失败:`, err)
+            message.warning(`模型「${modelData.name}」导入失败: ${err.message}`)
+          }
+        }
+
+        await fetchDirectories()
+
+        message.success(`目录「${dirData.name}」导入成功，共导入 ${importedCount}/${dirData.models.length} 个模型`)
+        handleCloseImportModal()
+
+        setExpandedKeys(prev => [...prev, `dir-${newDir.id}`])
+      } else {
+        if (!importModal.targetDirId) {
+          message.warning('请选择目标目录')
+          return
+        }
+
+        const modelData = importModal.parsed as ImportedModelData
+        await handleImportSingleModel(modelData, importModal.targetDirId, true)
+
+        await fetchDirectories()
+
+        message.success('模型导入成功')
+        handleCloseImportModal()
+      }
+    } catch (err: any) {
+      message.error('导入失败: ' + err.message)
+    }
+  }
+
   // ─── Save ───────────────────────────────────────────────
 
   const handleSave = async () => {
@@ -403,6 +638,8 @@ export function ProjectSidebar() {
               onClick: () => { setRenaming({ type: 'dir', id: dir.id }) } },
             { key: 'copy', icon: <CopyOutlined />, label: '复制目录',
               onClick: () => handleCopyDirectory(dir) },
+            { key: 'export', icon: <ExportOutlined />, label: '导出目录',
+              onClick: () => handleExportDirectory(dir) },
             { type: 'divider' },
             { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
               onClick: () => handleDeleteDirectory(dir) },
@@ -465,6 +702,8 @@ export function ProjectSidebar() {
                   setMoveTargetDirId(null)
                   setMoveModal({ type: 'model', id: model.id, currentDirId: model.directory_id })
                 } },
+              { key: 'export', icon: <ExportOutlined />, label: '导出模型',
+                onClick: () => handleExportModel(model) },
               { type: 'divider' },
               { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
                 onClick: () => handleDeleteModel(model) },
@@ -565,6 +804,10 @@ export function ProjectSidebar() {
                     style={{ color: '#faad14' }} onClick={handleSave} />
                 </Tooltip>
               )}
+              <Tooltip title="导入模型">
+                <Button type="text" size="small" icon={<ImportOutlined />}
+                  onClick={handleOpenImportModal} />
+              </Tooltip>
               <Tooltip title="新建目录">
                 <Button type="text" size="small" icon={<FolderAddOutlined />}
                   onClick={handleCreateDirectory} />
@@ -700,6 +943,202 @@ export function ProjectSidebar() {
               }))}
           />
         </div>
+      </Modal>
+
+      {/* Import Modal */}
+      <Modal
+        title={
+          importModal.parsed && isDirectoryImportData(importModal.parsed)
+            ? '📥 导入目录'
+            : '📥 导入模型'
+        }
+        open={importModal.open}
+        onCancel={handleCloseImportModal}
+        width={600}
+        footer={
+          importModal.parsed ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!isDirectoryImportData(importModal.parsed) && (
+                  <Select
+                    placeholder="选择目标目录"
+                    value={importModal.targetDirId}
+                    onChange={(v) => setImportModal(prev => ({ ...prev, targetDirId: v }))}
+                    style={{ width: 200 }}
+                    options={directories.map(d => ({
+                      value: d.id,
+                      label: `${d.name} (${models[d.id]?.length || 0} 个模型)`,
+                    }))}
+                  />
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Upload
+                  accept=".json"
+                  showUploadList={false}
+                  beforeUpload={handleImportFileSelect}
+                >
+                  <Button icon={<ReloadOutlined />}>重新选择文件</Button>
+                </Upload>
+                <Button
+                  type="primary"
+                  icon={<CheckOutlined />}
+                  onClick={handleImportConfirm}
+                  disabled={
+                    !isDirectoryImportData(importModal.parsed) && !importModal.targetDirId
+                  }
+                >
+                  {isDirectoryImportData(importModal.parsed) ? '导入目录' : '导入模型'}
+                </Button>
+              </div>
+            </div>
+          ) : null
+        }
+      >
+        {!importModal.parsed ? (
+          <div>
+            <Upload.Dragger
+              accept=".json"
+              showUploadList={false}
+              beforeUpload={handleImportFileSelect}
+              disabled={importModal.loading}
+              style={{ padding: '20px 0' }}
+            >
+              {importModal.loading ? (
+                <div style={{ padding: '20px 0' }}>
+                  <Spin size="large" />
+                  <p style={{ marginTop: 12, color: '#999' }}>正在解析文件...</p>
+                </div>
+              ) : (
+                <>
+                  <p className="ant-upload-drag-icon">
+                    <InboxOutlined />
+                  </p>
+                  <p className="ant-upload-text">点击或拖拽上传模型导出文件</p>
+                  <p className="ant-upload-hint">
+                    支持 .json 格式，即通过「导出模型」功能生成的文件
+                  </p>
+                </>
+              )}
+            </Upload.Dragger>
+
+            <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6f8fa', borderRadius: 8, fontSize: 12, color: '#666' }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>💡 提示</div>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>导入的文件必须是通过本系统「导出模型」功能生成的 JSON 文件</li>
+                <li>导入后会在目标目录下创建一个新模型</li>
+                <li>GLB 模型文件不会随模型导出，导入后需要重新上传</li>
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{
+              padding: 16,
+              background: '#f6ffed',
+              border: '1px solid #b7eb8f',
+              borderRadius: 8,
+              marginBottom: 16,
+            }}>
+              <div style={{ fontWeight: 600, color: '#52c41a', marginBottom: 4 }}>
+                ✅ 文件已解析
+              </div>
+              <div style={{ fontSize: 13, color: '#666' }}>
+                {importModal.file?.name}
+              </div>
+            </div>
+
+            {isDirectoryImportData(importModal.parsed) ? (
+              <div>
+                <Descriptions bordered size="small" column={2} title="目录信息">
+                  <Descriptions.Item label="目录名称">
+                    {(importModal.parsed as ImportedDirectoryData).name}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="模型数量">
+                    {(importModal.parsed as ImportedDirectoryData).model_count} 个
+                  </Descriptions.Item>
+                  {(importModal.parsed as ImportedDirectoryData).description && (
+                    <Descriptions.Item label="描述" span={2}>
+                      {(importModal.parsed as ImportedDirectoryData).description}
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>包含的模型：</div>
+                  <div style={{
+                    maxHeight: 200,
+                    overflow: 'auto',
+                    border: '1px solid #f0f0f0',
+                    borderRadius: 6,
+                  }}>
+                    {(importModal.parsed as ImportedDirectoryData).models.map((m, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '8px 12px',
+                          borderBottom: index < (importModal.parsed as ImportedDirectoryData).models.length - 1 ? '1px solid #f0f0f0' : 'none',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <FileOutlined style={{ color: '#8c8c8c' }} />
+                          <span>{m.name}</span>
+                        </span>
+                        <span style={{ color: '#999', fontSize: 12 }}>
+                          {m.scene_data?.length || 0} 栋建筑
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6f8fa', borderRadius: 8, fontSize: 12, color: '#666' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>💡 提示</div>
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    <li>导入后会创建一个新目录「{(importModal.parsed as ImportedDirectoryData).name}」</li>
+                    <li>所有模型将被导入到新创建的目录中</li>
+                    <li>GLB 模型文件不会随模型导出，导入后需要重新上传</li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Descriptions bordered size="small" column={2} title="模型信息">
+                  <Descriptions.Item label="模型名称">
+                    {(importModal.parsed as ImportedModelData).name}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="建筑数量">
+                    {(importModal.parsed as ImportedModelData).scene_data?.length || 0} 栋
+                  </Descriptions.Item>
+                  <Descriptions.Item label="城市">
+                    {(importModal.parsed as ImportedModelData).city_name}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="坐标">
+                    {(importModal.parsed as ImportedModelData).location_lat.toFixed(4)}, {(importModal.parsed as ImportedModelData).location_lng.toFixed(4)}
+                  </Descriptions.Item>
+                  {(importModal.parsed as ImportedModelData).description && (
+                    <Descriptions.Item label="描述" span={2}>
+                      {(importModal.parsed as ImportedModelData).description}
+                    </Descriptions.Item>
+                  )}
+                  {(importModal.parsed as ImportedModelData).canvas_size !== undefined && (
+                    <Descriptions.Item label="画布尺寸">
+                      {(importModal.parsed as ImportedModelData).canvas_size} 米
+                    </Descriptions.Item>
+                  )}
+                  {(importModal.parsed as ImportedModelData).terrain_data && (
+                    <Descriptions.Item label="地形数据">
+                      有 ({(importModal.parsed as ImportedModelData).terrain_data!.resolution}×{(importModal.parsed as ImportedModelData).terrain_data!.resolution})
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   )

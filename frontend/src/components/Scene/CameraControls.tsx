@@ -29,6 +29,13 @@ export function CameraControls() {
   const modelIdRef = useRef(currentModelId)
   modelIdRef.current = currentModelId
 
+  /** 缓存的相机裁剪面参数，避免不必要的矩阵更新 */
+  const lastClipStateRef = useRef({
+    distance: 0,
+    near: 0,
+    far: 0,
+  })
+
   /** 将当前相机状态写入 localStorage */
   const persistCamera = useCallback(() => {
     const ctrl = controlsRef.current
@@ -68,12 +75,30 @@ export function CameraControls() {
     const ctrl = controlsRef.current
     if (!ctrl) return
 
-    // 动态调整 near/far 裁剪面
+    // 动态调整 near/far 裁剪面 - 仅在距离变化显著时更新
     const camera = ctrl.object
     const distance = camera.position.distanceTo(ctrl.target)
-    camera.near = Math.max(0.1, distance * 0.001)
-    camera.far = Math.max(3000, distance * 20)
-    camera.updateProjectionMatrix()
+    const newNear = Math.max(0.1, distance * 0.001)
+    const newFar = Math.max(3000, distance * 20)
+
+    // 检查是否需要更新投影矩阵（避免不必要的 WebGL 操作）
+    const last = lastClipStateRef.current
+    const distanceChanged = Math.abs(distance - last.distance) > 0.1 // 距离变化超过 0.1 米才考虑更新
+    const nearChanged = Math.abs(newNear - last.near) > 0.001
+    const farChanged = Math.abs(newFar - last.far) > 1
+
+    if (distanceChanged && (nearChanged || farChanged)) {
+      camera.near = newNear
+      camera.far = newFar
+      camera.updateProjectionMatrix()
+      
+      // 缓存当前状态
+      lastClipStateRef.current = {
+        distance,
+        near: newNear,
+        far: newFar,
+      }
+    }
 
     // 节流保存
     const now = Date.now()

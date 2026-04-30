@@ -73,6 +73,12 @@ function validateValue(value: any, rule: ValidationRule, fieldName: string): Val
       break
 
     case 'boolean':
+      if (typeof value === 'number') {
+        if (value === 0 || value === 1) {
+          return null
+        }
+        return { field: fieldName, message: '必须是布尔值', value }
+      }
       if (typeof value !== 'boolean') {
         return { field: fieldName, message: '必须是布尔值', value }
       }
@@ -167,13 +173,21 @@ export function validate(schema: ValidationSchema) {
     // 校验 body
     if (schema.body) {
       for (const [field, rule] of Object.entries(schema.body)) {
-        const value = req.body?.[field]
-        
+        let value = req.body?.[field]
+
         // 应用默认值
         if ((value === undefined || value === null) && rule.default !== undefined && !rule.required) {
           req.body = req.body || {}
           req.body[field] = rule.default
           continue
+        }
+
+        // 类型转换：将数字 0/1 转换为布尔值（如果规则类型是 boolean）
+        if (value !== undefined && value !== null && rule.type === 'boolean') {
+          if (typeof value === 'number') {
+            value = !!value
+            req.body[field] = value
+          }
         }
 
         // 应用转换函数

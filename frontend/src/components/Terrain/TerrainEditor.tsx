@@ -13,6 +13,15 @@ const _hitVec = new Vector3()
 const _groundPlane = new Plane(new Vector3(0, 1, 0), 0)
 const _screenVec = new Vector3()
 
+// ── 样式缓存：避免不必要的 DOM 更新 ──────────
+interface BrushStyleCache {
+  display: string
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
 /**
  * 地形编辑器
  *
@@ -43,6 +52,16 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
   // 拖动中直接引用 heights，不走 state
   const heightsRef = useRef<Float32Array | null>(null)
   const resolutionRef = useRef(128)
+
+  // ── 性能优化：缓存 DOM 元素和样式状态 ──────────
+  const brushIndicatorRef = useRef<HTMLElement | null>(null)
+  const lastStyleRef = useRef<BrushStyleCache>({
+    display: 'none',
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+  })
 
   // 初始化地形数据
   useEffect(() => {
@@ -315,9 +334,11 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     }
   }, [terrainEditor.enabled, getWorldPosition, applyBrush, setTerrainEditor, finishDrawing])
 
-  // ── 笔刷位置跟踪（canvas 级别，始终生效）──────────
+  // ── 笔刷位置跟踪（仅在地形编辑启用时生效）──────────
 
   useEffect(() => {
+    if (!terrainEditor.enabled) return
+
     const canvas = gl.domElement
     const onMove = (e: PointerEvent) => {
       if (isDrawingRef.current) return // 绘制中由 capture handler 处理
@@ -326,33 +347,73 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     }
     canvas.addEventListener('pointermove', onMove)
     return () => canvas.removeEventListener('pointermove', onMove)
-  }, [gl.domElement, getWorldPosition, setTerrainEditor])
+  }, [terrainEditor.enabled, gl.domElement, getWorldPosition, setTerrainEditor])
 
   // ── 笔刷光标渲染 ──────────
 
   useFrame(() => {
-    const brushIndicator = document.getElementById('terrain-brush-indicator')
     const { brushPosition, brushRadius, enabled } = useStore.getState().terrainEditor
 
+    // 快速检查：如果不需要显示笔刷，只在状态变化时隐藏
     if (!enabled || !brushPosition || isDrawingRef.current) {
-      if (brushIndicator) brushIndicator.style.display = 'none'
+      if (lastStyleRef.current.display !== 'none') {
+        // 延迟获取 DOM 元素，避免不必要的查询
+        if (!brushIndicatorRef.current) {
+          brushIndicatorRef.current = document.getElementById('terrain-brush-indicator')
+        }
+        if (brushIndicatorRef.current) {
+          brushIndicatorRef.current.style.display = 'none'
+        }
+        lastStyleRef.current.display = 'none'
+      }
       return
     }
 
-    if (brushIndicator) {
-      _screenVec.set(brushPosition[0], 0, brushPosition[1])
-      _screenVec.project(camera)
-      const rect = gl.domElement.getBoundingClientRect()
+    // 计算新位置和大小（相机移动时需要重新计算）
+    _screenVec.set(brushPosition[0], 0, brushPosition[1])
+    _screenVec.project(camera)
 
-      const x = (_screenVec.x * 0.5 + 0.5) * rect.width + rect.left
-      const y = (-_screenVec.y * 0.5 + 0.5) * rect.height + rect.top
-      const pixelRadius = (brushRadius / canvasSize) * Math.min(rect.width, rect.height)
+    // 延迟获取 DOM 元素
+    if (!brushIndicatorRef.current) {
+      brushIndicatorRef.current = document.getElementById('terrain-brush-indicator')
+    }
 
-      brushIndicator.style.display = 'block'
-      brushIndicator.style.left = `${x - pixelRadius}px`
-      brushIndicator.style.top = `${y - pixelRadius}px`
-      brushIndicator.style.width = `${pixelRadius * 2}px`
-      brushIndicator.style.height = `${pixelRadius * 2}px`
+    if (!brushIndicatorRef.current) return
+
+    const rect = gl.domElement.getBoundingClientRect()
+    const x = (_screenVec.x * 0.5 + 0.5) * rect.width + rect.left
+    const y = (-_screenVec.y * 0.5 + 0.5) * rect.height + rect.top
+    const pixelRadius = (brushRadius / canvasSize) * Math.min(rect.width, rect.height)
+
+    const newStyle: BrushStyleCache = {
+      display: 'block',
+      left: x - pixelRadius,
+      top: y - pixelRadius,
+      width: pixelRadius * 2,
+      height: pixelRadius * 2,
+    }
+
+    // 只更新变化的样式，避免不必要的 DOM 操作
+    const last = lastStyleRef.current
+    if (last.display !== newStyle.display) {
+      brushIndicatorRef.current.style.display = newStyle.display
+      last.display = newStyle.display
+    }
+    if (last.left !== newStyle.left) {
+      brushIndicatorRef.current.style.left = `${newStyle.left}px`
+      last.left = newStyle.left
+    }
+    if (last.top !== newStyle.top) {
+      brushIndicatorRef.current.style.top = `${newStyle.top}px`
+      last.top = newStyle.top
+    }
+    if (last.width !== newStyle.width) {
+      brushIndicatorRef.current.style.width = `${newStyle.width}px`
+      last.width = newStyle.width
+    }
+    if (last.height !== newStyle.height) {
+      brushIndicatorRef.current.style.height = `${newStyle.height}px`
+      last.height = newStyle.height
     }
   })
 

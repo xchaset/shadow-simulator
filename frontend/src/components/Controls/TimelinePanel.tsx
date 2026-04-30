@@ -8,6 +8,24 @@ import { useStore } from '../../store/useStore'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { formatTime } from '../../utils/sunCalc'
 
+function getDayOfYear(date: Date): number {
+  const startOfYear = new Date(date.getFullYear(), 0, 1)
+  return Math.floor((date.getTime() - startOfYear.getTime()) / 86400000) + 1
+}
+
+interface SolarTerm {
+  label: string
+  month: number
+  day: number
+}
+
+const SOLAR_TERMS: SolarTerm[] = [
+  { label: '春分', month: 2, day: 20 },
+  { label: '夏至', month: 5, day: 21 },
+  { label: '秋分', month: 8, day: 22 },
+  { label: '冬至', month: 11, day: 21 },
+]
+
 export function TimelinePanel() {
   const dateTime = useStore(s => s.dateTime)
   const setDateTime = useStore(s => s.setDateTime)
@@ -37,6 +55,19 @@ export function TimelinePanel() {
       return `${d.getMonth() + 1}月${d.getDate()}日`
     },
   }), [year])
+
+  const dateMarks = useMemo(() => {
+    const marks: Record<number, { style: { fontSize: number; color: string }; label: string }> = {}
+    SOLAR_TERMS.forEach(term => {
+      const date = new Date(year, term.month, term.day)
+      const day = getDayOfYear(date)
+      marks[day] = {
+        style: { fontSize: 9, color: '#666' },
+        label: term.label,
+      }
+    })
+    return marks
+  }, [year])
 
   // ─── Time ──────────────────────────────────────────────
   const currentMinutes = dateTime.getHours() * 60 + dateTime.getMinutes()
@@ -89,6 +120,7 @@ export function TimelinePanel() {
             value={dayOfYear}
             onChange={handleDateChange}
             tooltip={dateTooltip}
+            marks={dateMarks}
             style={{ height: '100%' }}
           />
         </div>

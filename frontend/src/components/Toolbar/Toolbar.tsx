@@ -30,36 +30,51 @@ export function Toolbar({ onOpenMap }: ToolbarProps) {
       borderBottom: '1px solid #e8e8e8',
       zIndex: 10,
       flexShrink: 0,
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      scrollbarWidth: 'thin',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>
         <AppstoreOutlined /> 阴影模拟器
       </div>
-      <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
-      <CitySelector />
+      <div style={{ width: 1, height: 24, background: '#e8e8e8', flexShrink: 0 }} />
+      <div style={{ flexShrink: 0 }}>
+        <CitySelector />
+      </div>
       {onOpenMap && (
         <Button
           size="small"
           icon={<AimOutlined />}
           onClick={onOpenMap}
+          style={{ flexShrink: 0 }}
         >
           选点
         </Button>
       )}
-      <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
-      <BuildingTools />
-      <BuildingImporter />
-      <GlbImporter />
-      <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
+      <div style={{ width: 1, height: 24, background: '#e8e8e8', flexShrink: 0 }} />
+      <div style={{ flexShrink: 0 }}>
+        <BuildingTools />
+      </div>
+      <div style={{ flexShrink: 0 }}>
+        <BuildingImporter />
+      </div>
+      <div style={{ flexShrink: 0 }}>
+        <GlbImporter />
+      </div>
+      <div style={{ width: 1, height: 24, background: '#e8e8e8', flexShrink: 0 }} />
       <Button
         size="small"
         type={terrainEditor.enabled ? 'primary' : 'default'}
         icon={<EnvironmentOutlined />}
         onClick={toggleTerrain}
+        style={{ flexShrink: 0 }}
       >
         地貌
       </Button>
-      <div style={{ flex: 1 }} />
-      <SunInfoPanel />
+      <div style={{ flex: 1, minWidth: 16 }} />
+      <div style={{ flexShrink: 0 }}>
+        <SunInfoPanel />
+      </div>
     </div>
   )
 }

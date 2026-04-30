@@ -36,6 +36,10 @@ function parseRow(row: any) {
       row.terrain_data = parsed
     } catch { row.terrain_data = null }
   }
+  // 将 show_grid 从 INTEGER (0/1) 转换为 boolean
+  if (row.show_grid !== undefined && row.show_grid !== null) {
+    row.show_grid = !!row.show_grid
+  }
   return row
 }
 
