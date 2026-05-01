@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons'
 import type { TreeDataNode } from 'antd'
 import { useStore } from '../../store/useStore'
-import { directoryApi, modelApi, recentModelApi } from '../../utils/api'
+import { directoryApi, modelApi, recentModelApi, modelVersionApi, type ModelVersionDTO } from '../../utils/api'
 import { saveState } from '../../utils/storage'
 import {
   exportModel,
@@ -27,6 +27,7 @@ import {
 } from '../../utils/exportImport'
 import type { Directory, Model } from '../../types'
 import { TerrainToolbar } from '../Terrain/TerrainToolbar'
+import { MeasurementToolbar } from '../Measurement'
 
 export function ProjectSidebar() {
   const {
@@ -37,6 +38,7 @@ export function ProjectSidebar() {
     setDirty, setDirectories, directories,
     setCanvasSize, setShowGrid, setGridDivisions, setTerrainData,
     terrainEditor, setTerrainEditor,
+    measurementTool,
   } = useStore()
 
   const [models, setModels] = useState<Record<string, Model[]>>({})
@@ -72,6 +74,21 @@ export function ProjectSidebar() {
     parsed: null,
     loading: false,
     targetDirId: null,
+  })
+
+  // History versions modal state
+  const [historyModal, setHistoryModal] = useState<{
+    open: boolean
+    modelId: string | null
+    modelName: string
+    versions: ModelVersionDTO[]
+    loading: boolean
+  }>({
+    open: false,
+    modelId: null,
+    modelName: '',
+    versions: [],
+    loading: false,
   })
 
   // 加载最近打开的模型详情
@@ -249,6 +266,72 @@ export function ProjectSidebar() {
     } catch (err: any) {
       message.error('复制模型失败: ' + err.message)
     }
+  }
+
+  // ─── History versions operations ────────────────────────
+
+  const handleOpenHistoryModal = async (model: Model) => {
+    setHistoryModal({
+      open: true,
+      modelId: model.id,
+      modelName: model.name,
+      versions: [],
+      loading: true,
+    })
+
+    try {
+      const versions = await modelVersionApi.list(model.id)
+      setHistoryModal(prev => ({
+        ...prev,
+        versions,
+        loading: false,
+      }))
+    } catch (err: any) {
+      message.error('加载历史版本失败: ' + err.message)
+      setHistoryModal(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const handleRestoreVersion = async (versionId: string) => {
+    if (!historyModal.modelId) return
+
+    try {
+      const model = await modelVersionApi.restore(historyModal.modelId, versionId)
+      message.success('已回滚到历史版本')
+
+      if (currentModelId === historyModal.modelId) {
+        loadSceneFromModel(model)
+      }
+
+      await fetchDirectories()
+
+      const versions = await modelVersionApi.list(historyModal.modelId)
+      setHistoryModal(prev => ({ ...prev, versions }))
+    } catch (err: any) {
+      message.error('回滚失败: ' + err.message)
+    }
+  }
+
+  const handleDeleteVersion = (version: ModelVersionDTO) => {
+    Modal.confirm({
+      title: '删除历史版本',
+      icon: <ExclamationCircleOutlined />,
+      content: `确定删除版本 v${version.version_number}？此操作不可撤销。`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        if (!historyModal.modelId) return
+        try {
+          await modelVersionApi.delete(historyModal.modelId, version.id)
+          message.success('已删除')
+          const versions = await modelVersionApi.list(historyModal.modelId)
+          setHistoryModal(prev => ({ ...prev, versions }))
+        } catch (err: any) {
+          message.error('删除失败: ' + err.message)
+        }
+      },
+    })
   }
 
   const handleMoveModelConfirm = async () => {
@@ -562,12 +645,45 @@ export function ProjectSidebar() {
   // ─── Save ───────────────────────────────────────────────
 
   const handleSave = async () => {
+    console.log('[ProjectSidebar] handleSave 开始')
+    
     if (!currentModelId) {
       message.warning('请先选择或创建一个模型')
+      console.log('[ProjectSidebar] 保存失败：没有 currentModelId')
       return
     }
+    
+    const { terrainData, canvasSize, showGrid, gridDivisions, dirty } = useStore.getState()
+    console.log('[ProjectSidebar] 保存前的状态:', {
+      currentModelId,
+      dirty,
+      terrainDataExists: !!terrainData,
+      terrainDataDetails: terrainData ? {
+        resolution: terrainData.resolution,
+        heightsLength: terrainData.heights?.length,
+        maxHeight: terrainData.maxHeight,
+        sampleHeights: terrainData.heights ? Array.from(terrainData.heights.slice(0, 5)) : null
+      } : null,
+      canvasSize,
+      showGrid,
+      gridDivisions,
+      buildingsCount: buildings.length
+    })
+    
     try {
-      const { terrainData, canvasSize, showGrid, gridDivisions } = useStore.getState()
+      const terrainDataToSend = terrainData ? {
+        resolution: terrainData.resolution,
+        heights: Array.from(terrainData.heights),
+        maxHeight: terrainData.maxHeight,
+      } : null
+      
+      console.log('[ProjectSidebar] 准备发送的 terrain_data:', terrainDataToSend ? {
+        resolution: terrainDataToSend.resolution,
+        heightsLength: terrainDataToSend.heights?.length,
+        maxHeight: terrainDataToSend.maxHeight,
+        sampleHeights: terrainDataToSend.heights?.slice(0, 5)
+      } : 'null')
+      
       await modelApi.update(currentModelId, {
         scene_data: buildings,
         location_lat: location.lat,
@@ -577,16 +693,16 @@ export function ProjectSidebar() {
         canvas_size: canvasSize,
         show_grid: showGrid,
         grid_divisions: gridDivisions,
-        terrain_data: terrainData ? {
-          resolution: terrainData.resolution,
-          heights: Array.from(terrainData.heights),
-          maxHeight: terrainData.maxHeight,
-        } : null,
+        terrain_data: terrainDataToSend,
       })
+      
+      console.log('[ProjectSidebar] 保存请求发送成功')
       setDirty(false)
       await fetchDirectories()
       message.success('已保存')
+      console.log('[ProjectSidebar] handleSave 结束，保存成功')
     } catch (err: any) {
+      console.error('[ProjectSidebar] 保存失败:', err)
       message.error('保存失败: ' + err.message)
     }
   }
@@ -704,6 +820,8 @@ export function ProjectSidebar() {
                 } },
               { key: 'export', icon: <ExportOutlined />, label: '导出模型',
                 onClick: () => handleExportModel(model) },
+              { key: 'history', icon: <ReloadOutlined />, label: '历史版本',
+                onClick: () => handleOpenHistoryModal(model) },
               { type: 'divider' },
               { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
                 onClick: () => handleDeleteModel(model) },
@@ -913,6 +1031,11 @@ export function ProjectSidebar() {
       {/* 地貌编辑工具栏 - 显示在左侧边栏内 */}
       {terrainEditor.enabled && (
         <TerrainToolbar onReset={() => setTerrainEditor({ enabled: false })} />
+      )}
+
+      {/* 测量工具栏 - 显示在左侧边栏内 */}
+      {measurementTool.enabled && (
+        <MeasurementToolbar />
       )}
 
       {/* Move Modal */}
@@ -1139,6 +1262,122 @@ export function ProjectSidebar() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* History Versions Modal */}
+      <Modal
+        title={`📜 历史版本 - ${historyModal.modelName}`}
+        open={historyModal.open}
+        onCancel={() => setHistoryModal(prev => ({ ...prev, open: false }))}
+        width={700}
+        footer={null}
+      >
+        {historyModal.loading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Spin size="large" />
+            <p style={{ marginTop: 12, color: '#999' }}>正在加载历史版本...</p>
+          </div>
+        ) : historyModal.versions.length === 0 ? (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="暂无历史版本"
+            style={{ padding: '40px 0' }}
+          >
+            <div style={{ fontSize: 12, color: '#999' }}>
+              每次保存模型时会自动创建历史版本快照
+            </div>
+          </Empty>
+        ) : (
+          <div style={{ maxHeight: 500, overflow: 'auto' }}>
+            {historyModal.versions.map((version, index) => (
+              <div
+                key={version.id}
+                style={{
+                  padding: '12px 16px',
+                  borderBottom: index < historyModal.versions.length - 1 ? '1px solid #f0f0f0' : 'none',
+                  borderRadius: 6,
+                  marginBottom: 4,
+                  background: index === 0 ? '#f6ffed' : '#fafafa',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: index === 0 ? '#52c41a' : '#333',
+                    }}>
+                      v{version.version_number}
+                    </span>
+                    {index === 0 && (
+                      <span style={{
+                        fontSize: 10,
+                        padding: '0 6px',
+                        background: '#52c41a',
+                        color: '#fff',
+                        borderRadius: 4,
+                      }}>
+                        最新
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Button
+                      size="small"
+                      type="primary"
+                      ghost
+                      onClick={() => handleRestoreVersion(version.id)}
+                    >
+                      回滚到此版本
+                    </Button>
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => handleDeleteVersion(version)}
+                    >
+                      删除
+                    </Button>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  gap: 16,
+                  fontSize: 12,
+                  color: '#999',
+                  flexWrap: 'wrap',
+                }}>
+                  <span>📅 {new Date(version.created_at).toLocaleString()}</span>
+                  <span>🏢 {version.building_count} 栋建筑</span>
+                  {version.name && <span>📝 {version.name}</span>}
+                  <span>📍 {version.city_name}</span>
+                  <span>📐 {version.canvas_size}m</span>
+                  {version.terrain_data && <span>🗺️ 有地形</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{
+          marginTop: 16,
+          padding: '12px 16px',
+          background: '#f6f8fa',
+          borderRadius: 8,
+          fontSize: 12,
+          color: '#666',
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>💡 提示</div>
+          <ul style={{ margin: 0, paddingLeft: 16 }}>
+            <li>每次保存模型时会自动创建一个新的历史版本</li>
+            <li>回滚到旧版本前，会自动将当前状态保存为新版本</li>
+            <li>删除历史版本不会影响当前模型状态</li>
+          </ul>
+        </div>
       </Modal>
     </div>
   )

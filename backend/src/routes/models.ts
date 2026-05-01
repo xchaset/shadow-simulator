@@ -29,14 +29,97 @@ function parseRow(row: any) {
   if (typeof row.terrain_data === 'string') {
     try {
       const parsed = JSON.parse(row.terrain_data)
-      // 将 heights 转换为 Float32Array
-      if (parsed && parsed.heights) {
-        parsed.heights = new Float32Array(parsed.heights)
-      }
+      // heights 保持为普通 number[]，由前端在加载时转换为 Float32Array
       row.terrain_data = parsed
     } catch { row.terrain_data = null }
   }
   // 将 show_grid 从 INTEGER (0/1) 转换为 boolean
+  if (row.show_grid !== undefined && row.show_grid !== null) {
+    row.show_grid = !!row.show_grid
+  }
+  return row
+}
+
+/** Serialize terrain data for storage */
+function serializeTerrainData(terrain_data: any): string | null {
+  console.log('[models.ts] serializeTerrainData 被调用，输入:', {
+    terrainDataExists: !!terrain_data,
+    terrainDataType: typeof terrain_data,
+    isArray: Array.isArray(terrain_data),
+    heightsExists: terrain_data?.heights !== undefined && terrain_data?.heights !== null,
+    heightsType: terrain_data?.heights ? typeof terrain_data.heights : 'N/A',
+    heightsIsArray: terrain_data?.heights ? Array.isArray(terrain_data.heights) : 'N/A',
+    heightsLength: terrain_data?.heights?.length
+  })
+  
+  if (!terrain_data || !terrain_data.heights) {
+    console.log('[models.ts] serializeTerrainData 返回 null')
+    return null
+  }
+  
+  const result = JSON.stringify({
+    ...terrain_data,
+    heights: Array.from(terrain_data.heights),
+  })
+  
+  console.log('[models.ts] serializeTerrainData 序列化结果长度:', result.length)
+  return result
+}
+
+/** Create a version snapshot for a model */
+function createVersionSnapshot(modelId: string, modelData: any) {
+  const versionId = uuidv4()
+  
+  // 获取下一个版本号
+  const lastVersion = db.prepare(`
+    SELECT version_number FROM model_versions 
+    WHERE model_id = ? 
+    ORDER BY version_number DESC 
+    LIMIT 1
+  `).get(modelId)
+  
+  const nextVersionNumber = lastVersion ? (lastVersion as any).version_number + 1 : 1
+  
+  db.prepare(`
+    INSERT INTO model_versions (
+      id, model_id, version_number, name, description, location_lat, location_lng,
+      city_name, date_time, building_count, scene_data, canvas_size, show_grid,
+      grid_divisions, thumbnail, terrain_data
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    versionId,
+    modelId,
+    nextVersionNumber,
+    modelData.name || '',
+    modelData.description || '',
+    modelData.location_lat ?? 39.9042,
+    modelData.location_lng ?? 116.4074,
+    modelData.city_name || '北京',
+    modelData.date_time || new Date().toISOString(),
+    modelData.building_count ?? 0,
+    modelData.scene_data || '[]',
+    modelData.canvas_size ?? 2000,
+    modelData.show_grid !== undefined ? (modelData.show_grid ? 1 : 0) : 1,
+    modelData.grid_divisions ?? 200,
+    modelData.thumbnail || null,
+    modelData.terrain_data || null
+  )
+  
+  return { version_id: versionId, version_number: nextVersionNumber }
+}
+
+/** Parse version row (similar to parseRow but for model_versions) */
+function parseVersionRow(row: any) {
+  if (!row) return row
+  if (typeof row.scene_data === 'string') {
+    try { row.scene_data = JSON.parse(row.scene_data) } catch { row.scene_data = [] }
+  }
+  if (typeof row.terrain_data === 'string') {
+    try {
+      const parsed = JSON.parse(row.terrain_data)
+      row.terrain_data = parsed
+    } catch { row.terrain_data = null }
+  }
   if (row.show_grid !== undefined && row.show_grid !== null) {
     row.show_grid = !!row.show_grid
   }
@@ -76,13 +159,8 @@ router.post('/directories/:dirId/models', validate(schema.createModel), (req, re
   const dt = date_time || new Date().toISOString()
 
   // 序列化 terrain_data
-  let terrainStr = null
-  if (terrain_data && terrain_data.heights) {
-    terrainStr = JSON.stringify({
-      ...terrain_data,
-      heights: Array.from(terrain_data.heights),
-    })
-  }
+  const terrainStr = serializeTerrainData(terrain_data)
+  const showGridValue = show_grid !== undefined ? (show_grid ? 1 : 0) : 1
 
   db.prepare(`
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
@@ -91,7 +169,23 @@ router.post('/directories/:dirId/models', validate(schema.createModel), (req, re
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, dirId, name, description, location_lat, location_lng,
          city_name, dt, buildingCount, sceneStr, sort_order,
-         canvas_size ?? 2000, show_grid !== undefined ? (show_grid ? 1 : 0) : 1, grid_divisions ?? 200, terrainStr)
+         canvas_size ?? 2000, showGridValue, grid_divisions ?? 200, terrainStr)
+
+  // 创建初始版本快照
+  createVersionSnapshot(id, {
+    name,
+    description,
+    location_lat,
+    location_lng,
+    city_name,
+    date_time: dt,
+    building_count: buildingCount,
+    scene_data: sceneStr,
+    canvas_size: canvas_size ?? 2000,
+    show_grid: showGridValue,
+    grid_divisions: grid_divisions ?? 200,
+    terrain_data: terrainStr,
+  })
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
   res.status(201).json(parseRow(row))
@@ -107,9 +201,24 @@ router.get('/models/:id', validate(schema.getModel), (req, res) => {
 
 // ─── PUT /api/models/:id ──────────────────────────────────
 router.put('/models/:id', validate(schema.updateModel), (req, res) => {
+  console.log('[models.ts] PUT /api/models/:id 被调用')
+  console.log('[models.ts] req.body:', JSON.stringify({
+    ...req.body,
+    scene_data: req.body.scene_data ? `[${req.body.scene_data.length} items]` : 'undefined',
+    terrain_data: req.body.terrain_data ? {
+      resolution: req.body.terrain_data.resolution,
+      heightsLength: req.body.terrain_data.heights?.length,
+      maxHeight: req.body.terrain_data.maxHeight,
+      heightsSample: req.body.terrain_data.heights?.slice(0, 5)
+    } : 'null/undefined'
+  }, null, 2))
+  
   const { id } = req.params
-  const existing = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
-  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+  const existing: any = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
+  if (!existing) { 
+    console.log('[models.ts] 模型不存在:', id)
+    res.status(404).json({ error: '模型不存在' }); return 
+  }
 
   const { name, description, location_lat, location_lng, city_name,
           date_time, scene_data, sort_order,
@@ -118,32 +227,79 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
   const updates: string[] = []
   const values: any[] = []
 
-  if (name !== undefined) { updates.push('name = ?'); values.push(name) }
-  if (description !== undefined) { updates.push('description = ?'); values.push(description) }
-  if (location_lat !== undefined) { updates.push('location_lat = ?'); values.push(location_lat) }
-  if (location_lng !== undefined) { updates.push('location_lng = ?'); values.push(location_lng) }
-  if (city_name !== undefined) { updates.push('city_name = ?'); values.push(city_name) }
-  if (date_time !== undefined) { updates.push('date_time = ?'); values.push(date_time) }
-  if (sort_order !== undefined) { updates.push('sort_order = ?'); values.push(sort_order) }
-  if (canvas_size !== undefined) { updates.push('canvas_size = ?'); values.push(canvas_size) }
-  if (show_grid !== undefined) { updates.push('show_grid = ?'); values.push(show_grid ? 1 : 0) }
-  if (grid_divisions !== undefined) { updates.push('grid_divisions = ?'); values.push(grid_divisions) }
+  // 准备更新后的数据（用于创建快照）
+  const updatedData = { ...existing }
 
+  if (name !== undefined) {
+    updates.push('name = ?'); values.push(name)
+    updatedData.name = name
+  }
+  if (description !== undefined) {
+    updates.push('description = ?'); values.push(description)
+    updatedData.description = description
+  }
+  if (location_lat !== undefined) {
+    updates.push('location_lat = ?'); values.push(location_lat)
+    updatedData.location_lat = location_lat
+  }
+  if (location_lng !== undefined) {
+    updates.push('location_lng = ?'); values.push(location_lng)
+    updatedData.location_lng = location_lng
+  }
+  if (city_name !== undefined) {
+    updates.push('city_name = ?'); values.push(city_name)
+    updatedData.city_name = city_name
+  }
+  if (date_time !== undefined) {
+    updates.push('date_time = ?'); values.push(date_time)
+    updatedData.date_time = date_time
+  }
+  if (sort_order !== undefined) {
+    updates.push('sort_order = ?'); values.push(sort_order)
+    updatedData.sort_order = sort_order
+  }
+  if (canvas_size !== undefined) {
+    updates.push('canvas_size = ?'); values.push(canvas_size)
+    updatedData.canvas_size = canvas_size
+  }
+  if (show_grid !== undefined) {
+    const showGridValue = show_grid ? 1 : 0
+    updates.push('show_grid = ?'); values.push(showGridValue)
+    updatedData.show_grid = showGridValue
+  }
+  if (grid_divisions !== undefined) {
+    updates.push('grid_divisions = ?'); values.push(grid_divisions)
+    updatedData.grid_divisions = grid_divisions
+  }
+
+  let sceneStr: string | undefined
+  let buildingCount: number | undefined
   if (scene_data !== undefined) {
     const { str, count } = normalizeSceneData(scene_data)
     updates.push('scene_data = ?'); values.push(str)
     updates.push('building_count = ?'); values.push(count)
+    sceneStr = str
+    buildingCount = count
+    updatedData.scene_data = str
+    updatedData.building_count = count
   }
 
+  let terrainStr: string | null | undefined
+  console.log('[models.ts] 检查 terrain_data:', {
+    terrain_data,
+    isUndefined: terrain_data === undefined,
+    isNull: terrain_data === null
+  })
+  
   if (terrain_data !== undefined) {
-    let terrainStr = null
-    if (terrain_data && terrain_data.heights) {
-      terrainStr = JSON.stringify({
-        ...terrain_data,
-        heights: Array.from(terrain_data.heights),
-      })
-    }
+    console.log('[models.ts] terrain_data 不为 undefined，准备序列化')
+    terrainStr = serializeTerrainData(terrain_data)
+    console.log('[models.ts] 序列化后的 terrainStr:', terrainStr ? `[${terrainStr.length} chars]` : 'null')
     updates.push('terrain_data = ?'); values.push(terrainStr)
+    updatedData.terrain_data = terrainStr
+    console.log('[models.ts] 已添加 terrain_data 到更新列表')
+  } else {
+    console.log('[models.ts] terrain_data 为 undefined，不更新')
   }
 
   if (updates.length === 0) {
@@ -154,6 +310,10 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
   values.push(id)
 
   db.prepare(`UPDATE models SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+  
+  // 创建版本快照
+  createVersionSnapshot(id, updatedData)
+  
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
   res.json(parseRow(row))
 })
@@ -246,6 +406,95 @@ router.get('/recent-models', (req, res) => {
 router.delete('/recent-models/:id', validate(schema.getModel), (req, res) => {
   const { id } = req.params
   db.prepare('DELETE FROM recent_models WHERE model_id = ?').run(id)
+  res.json({ success: true })
+})
+
+// ─── GET /api/models/:id/versions ─────────────────────────
+router.get('/models/:id/versions', validate(schema.getModel), (req, res) => {
+  const { id } = req.params
+  const limit = Math.min(Number(req.query.limit) || 50, 100)
+  
+  const existing = db.prepare('SELECT id FROM models WHERE id = ?').get(id)
+  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+  
+  const rows = db.prepare(`
+    SELECT id, model_id, version_number, name, description, location_lat, location_lng,
+           city_name, date_time, building_count, canvas_size, show_grid, grid_divisions,
+           created_at
+    FROM model_versions
+    WHERE model_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(id, limit)
+  
+  res.json(rows.map(parseVersionRow))
+})
+
+// ─── GET /api/models/:id/versions/:versionId ──────────────
+router.get('/models/:id/versions/:versionId', validate(schema.getVersion), (req, res) => {
+  const { id, versionId } = req.params
+  
+  const existing = db.prepare('SELECT id FROM models WHERE id = ?').get(id)
+  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+  
+  const row = db.prepare(`
+    SELECT * FROM model_versions WHERE id = ? AND model_id = ?
+  `).get(versionId, id)
+  
+  if (!row) { res.status(404).json({ error: '版本不存在' }); return }
+  
+  res.json(parseVersionRow(row))
+})
+
+// ─── POST /api/models/:id/versions/:versionId/restore ─────
+router.post('/models/:id/versions/:versionId/restore', validate(schema.getVersion), (req, res) => {
+  const { id, versionId } = req.params
+  
+  const existing: any = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
+  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+  
+  const version: any = db.prepare(`
+    SELECT * FROM model_versions WHERE id = ? AND model_id = ?
+  `).get(versionId, id)
+  
+  if (!version) { res.status(404).json({ error: '版本不存在' }); return }
+  
+  // 在回滚之前，先保存当前状态作为一个新版本
+  createVersionSnapshot(id, existing)
+  
+  // 回滚到指定版本
+  db.prepare(`
+    UPDATE models SET
+      name = ?, description = ?, location_lat = ?, location_lng = ?,
+      city_name = ?, date_time = ?, building_count = ?, scene_data = ?,
+      canvas_size = ?, show_grid = ?, grid_divisions = ?, terrain_data = ?,
+      updated_at = datetime('now', 'localtime')
+    WHERE id = ?
+  `).run(
+    version.name, version.description, version.location_lat, version.location_lng,
+    version.city_name, version.date_time, version.building_count, version.scene_data,
+    version.canvas_size, version.show_grid, version.grid_divisions, version.terrain_data,
+    id
+  )
+  
+  const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
+  res.json(parseRow(row))
+})
+
+// ─── DELETE /api/models/:id/versions/:versionId ───────────
+router.delete('/models/:id/versions/:versionId', validate(schema.getVersion), (req, res) => {
+  const { id, versionId } = req.params
+  
+  const existing = db.prepare('SELECT id FROM models WHERE id = ?').get(id)
+  if (!existing) { res.status(404).json({ error: '模型不存在' }); return }
+  
+  const version = db.prepare(`
+    SELECT id FROM model_versions WHERE id = ? AND model_id = ?
+  `).get(versionId, id)
+  
+  if (!version) { res.status(404).json({ error: '版本不存在' }); return }
+  
+  db.prepare('DELETE FROM model_versions WHERE id = ?').run(versionId)
   res.json({ success: true })
 })
 

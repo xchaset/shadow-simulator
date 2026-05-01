@@ -35,8 +35,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const URL_REGEX = /^https?:\/\/.+/
 
 function validateValue(value: any, rule: ValidationRule, fieldName: string): ValidationError | null {
+  console.log(`[validator] validateValue 开始: field=${fieldName}, type=${typeof value}, rule.type=${rule.type}`)
+  
   // 处理 undefined/null
   if (value === undefined || value === null) {
+    console.log(`[validator] validateValue: field=${fieldName} 是 ${value === undefined ? 'undefined' : 'null'}, required=${rule.required}`)
     if (rule.required) {
       return { field: fieldName, message: '字段不能为空' }
     }
@@ -103,15 +106,21 @@ function validateValue(value: any, rule: ValidationRule, fieldName: string): Val
       break
 
     case 'object':
+      console.log(`[validator] validateValue object 类型校验: field=${fieldName}, typeof=${typeof value}, Array.isArray=${Array.isArray(value)}`)
       if (typeof value !== 'object' || Array.isArray(value)) {
+        console.log(`[validator] validateValue object 校验失败: field=${fieldName}`)
         return { field: fieldName, message: '必须是对象', value }
       }
       if (rule.properties) {
+        console.log(`[validator] validateValue object 有 properties 定义，开始校验子属性`)
         for (const [key, propRule] of Object.entries(rule.properties)) {
           const propError = validateValue(value[key], propRule, `${fieldName}.${key}`)
           if (propError) return propError
         }
+      } else {
+        console.log(`[validator] validateValue object 没有 properties 定义，跳过子属性校验`)
       }
+      console.log(`[validator] validateValue object 校验通过: field=${fieldName}`)
       break
 
     case 'uuid':
@@ -168,10 +177,34 @@ function validateValue(value: any, rule: ValidationRule, fieldName: string): Val
 
 export function validate(schema: ValidationSchema) {
   return (req: Request, res: Response, next: NextFunction) => {
+    console.log('[validator] validate 中间件被调用')
+    console.log('[validator] 请求路径:', req.method, req.path)
+    
+    // 安全地记录 req.body
+    if (req.body && typeof req.body === 'object') {
+      const bodyLog: any = { ...req.body }
+      if (bodyLog.scene_data && Array.isArray(bodyLog.scene_data)) {
+        bodyLog.scene_data = `[${bodyLog.scene_data.length} items]`
+      }
+      if (bodyLog.terrain_data && typeof bodyLog.terrain_data === 'object') {
+        bodyLog.terrain_data = {
+          resolution: bodyLog.terrain_data.resolution,
+          heightsLength: bodyLog.terrain_data.heights?.length,
+          maxHeight: bodyLog.terrain_data.maxHeight
+        }
+      } else if (bodyLog.terrain_data === null) {
+        bodyLog.terrain_data = 'null'
+      }
+      console.log('[validator] req.body:', JSON.stringify(bodyLog, null, 2))
+    } else {
+      console.log('[validator] req.body:', req.body === undefined ? 'undefined' : JSON.stringify(req.body))
+    }
+    
     const errors: ValidationError[] = []
 
     // 校验 body
     if (schema.body) {
+      console.log('[validator] 开始校验 body，schema.body 字段:', Object.keys(schema.body))
       for (const [field, rule] of Object.entries(schema.body)) {
         let value = req.body?.[field]
 

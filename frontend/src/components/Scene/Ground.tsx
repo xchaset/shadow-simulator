@@ -16,7 +16,7 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
   const terrainData = useStore(s => s.terrainData)
   const terrainEditor = useStore(s => s.terrainEditor)
   const meshRef = useRef<any>(null)
-  const hasTerrain = terrainData && terrainEditor.enabled
+  const hasTerrain = terrainData !== null
 
   // 更新地形高度
   // 绘制中由 TerrainEditor 直接操作几何体（局部更新 + RAF 批处理），

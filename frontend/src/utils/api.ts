@@ -170,3 +170,102 @@ export const recentModelApi = {
   remove: (modelId: string) =>
     request<{ success: boolean }>(`/recent-models/${modelId}`, { method: 'DELETE' }),
 }
+
+// ─── Model Version API ─────────────────────────────────────
+
+export interface ModelVersionDTO {
+  id: string
+  model_id: string
+  version_number: number
+  name: string
+  description: string
+  location_lat: number
+  location_lng: number
+  city_name: string
+  date_time: string
+  building_count: number
+  scene_data?: Building[]
+  canvas_size: number
+  show_grid: boolean
+  grid_divisions: number
+  thumbnail?: string
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  created_at: string
+}
+
+export const modelVersionApi = {
+  list: (modelId: string, limit = 50) =>
+    request<ModelVersionDTO[]>(`/models/${modelId}/versions?limit=${limit}`),
+
+  get: (modelId: string, versionId: string) =>
+    request<ModelVersionDTO>(`/models/${modelId}/versions/${versionId}`),
+
+  restore: (modelId: string, versionId: string) =>
+    request<ModelDTO>(`/models/${modelId}/versions/${versionId}/restore`, {
+      method: 'POST',
+    }),
+
+  delete: (modelId: string, versionId: string) =>
+    request<{ success: boolean }>(`/models/${modelId}/versions/${versionId}`, {
+      method: 'DELETE',
+    }),
+}
+
+// ─── Share API ────────────────────────────────────────────
+
+export interface ShareDTO {
+  id: string
+  token: string
+  model_id: string | null
+  name: string
+  description: string
+  location_lat: number
+  location_lng: number
+  city_name: string
+  date_time: string
+  building_count: number
+  scene_data?: Building[]
+  canvas_size: number
+  show_grid: boolean
+  grid_divisions: number
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  expires_at: string | null
+  view_count: number
+  is_read_only: boolean
+  created_at: string
+}
+
+export interface CreateShareParams {
+  model_id?: string
+  name: string
+  description?: string
+  location_lat?: number
+  location_lng?: number
+  city_name?: string
+  date_time?: string
+  scene_data?: Building[]
+  canvas_size?: number
+  show_grid?: boolean
+  grid_divisions?: number
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  expires_in_hours?: number
+}
+
+export const shareApi = {
+  create: (params: CreateShareParams) =>
+    request<ShareDTO>('/shares', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  get: (token: string) =>
+    request<ShareDTO>(`/shares/${token}`),
+
+  listByModel: (modelId: string) =>
+    request<ShareDTO[]>(`/shares/model/${modelId}`),
+
+  delete: (token: string) =>
+    request<{ success: boolean }>(`/shares/${token}`, {
+      method: 'DELETE',
+    }),
+}

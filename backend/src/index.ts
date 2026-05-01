@@ -5,6 +5,7 @@ import directoriesRouter from './routes/directories.js'
 import modelsRouter from './routes/models.js'
 import aiRouter from './routes/ai.js'
 import uploadsRouter from './routes/uploads.js'
+import sharesRouter from './routes/shares.js'
 
 const app = express()
 const PORT = process.env.PORT || 3002
@@ -17,6 +18,7 @@ app.use('/api/directories', directoriesRouter)
 app.use('/api', modelsRouter)
 app.use('/api/ai', aiRouter)
 app.use('/api', uploadsRouter)
+app.use('/api', sharesRouter)
 
 // Health check
 app.get('/api/health', (_req, res) => {

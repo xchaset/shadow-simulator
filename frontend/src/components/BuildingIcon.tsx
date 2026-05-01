@@ -121,6 +121,107 @@ const ICON_MAP: Record<string, ReactNode> = {
       <text x="12" y="22" textAnchor="middle" fontSize="6" fill="currentColor" fontWeight="bold">GLB</text>
     </svg>
   ),
+  pavilion: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M2,12 L12,3 L22,12 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.5" />
+      <rect x="5" y="12" width="2" height="10" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1" />
+      <rect x="17" y="12" width="2" height="10" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1" />
+      <circle cx="12" cy="3" r="1.5" fill="currentColor" />
+    </svg>
+  ),
+  'pavilion-square': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M3,10 L12,3 L21,10 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.5" />
+      <rect x="3" y="10" width="18" height="12" stroke="currentColor" fill="none" strokeWidth="1.5" />
+      <rect x="5" y="10" width="2" height="12" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1" />
+      <rect x="17" y="10" width="2" height="12" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1" />
+    </svg>
+  ),
+  tower: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="7" y="6" width="10" height="16" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="5" y="12" width="14" height="10" stroke="currentColor" fill="none" strokeWidth="1.5" />
+      <rect x="3" y="18" width="18" height="4" stroke="currentColor" fill="none" strokeWidth="1.5" />
+      <path d="M10,6 L12,2 L14,6 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1.5" />
+    </svg>
+  ),
+  'glass-building': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="5" y="4" width="14" height="18" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="7" y="6" width="4" height="3" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="13" y="6" width="4" height="3" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="7" y="11" width="4" height="3" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="13" y="11" width="4" height="3" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="7" y="16" width="4" height="3" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="13" y="16" width="4" height="3" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+    </svg>
+  ),
+  'glass-tower': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="6" y="2" width="12" height="20" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <line x1="6" y1="6" x2="18" y2="6" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="6" y1="10" x2="18" y2="10" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="6" y1="14" x2="18" y2="14" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="6" y1="18" x2="18" y2="18" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+    </svg>
+  ),
+  'glass-complex': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="8" width="6" height="14" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="9" y="4" width="5" height="18" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="15" y="10" width="7" height="12" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+    </svg>
+  ),
+  residential: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="3" y="8" width="18" height="14" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="1" strokeOpacity="0.5" />
+      <line x1="3" y1="16" x2="21" y2="16" stroke="currentColor" strokeWidth="1" strokeOpacity="0.5" />
+      <rect x="6" y="9" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.7" />
+      <rect x="11" y="9" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.7" />
+      <rect x="16" y="9" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.7" />
+      <rect x="6" y="13" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.7" />
+      <rect x="11" y="13" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.7" />
+      <rect x="16" y="13" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.7" />
+      <rect x="6" y="17" width="3" height="4" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1" />
+    </svg>
+  ),
+  'residential-high': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="6" y="2" width="12" height="20" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <line x1="6" y1="6" x2="18" y2="6" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="6" y1="10" x2="18" y2="10" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="6" y1="14" x2="18" y2="14" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="6" y1="18" x2="18" y2="18" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <rect x="8" y="3" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="13" y="3" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="8" y="7" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="13" y="7" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="8" y="11" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="13" y="11" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="8" y="15" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+      <rect x="13" y="15" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.6" />
+    </svg>
+  ),
+  'residential-complex': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="10" width="8" height="12" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="11" y="6" width="6" height="16" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="18" y="12" width="5" height="10" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="8" y="20" width="6" height="2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+    </svg>
+  ),
+  'residential-l': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M2,4 H12 V12 H22 V22 H2 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <line x1="2" y1="8" x2="12" y2="8" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="2" y1="12" x2="12" y2="12" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="2" y1="16" x2="22" y2="16" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="2" y1="20" x2="22" y2="20" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+      <line x1="12" y1="16" x2="12" y2="22" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+    </svg>
+  ),
 }
 
 export function BuildingIcon({ name }: { name: string }) {

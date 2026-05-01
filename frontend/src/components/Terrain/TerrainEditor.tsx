@@ -138,6 +138,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
         heights: new Float32Array(128 * 128),
         maxHeight: 50,
       }
+      console.log('[TerrainEditor] 初始化地形数据:', newData)
       useStore.getState().setTerrainData(newData)
       data = newData
     }
@@ -147,6 +148,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     const radiusInIndices = Math.ceil((brushRadius / canvasSize) * 128)
 
     if (isFirst) {
+      console.log('[TerrainEditor] 开始绘制，模式:', brushMode, '位置:', [cx, cy], '半径:', radiusInIndices)
       useStore.getState().pushTerrainUndo()
       // 拖动开始：缓存引用，后续直接操作
       heightsRef.current = data.heights as Float32Array
@@ -210,6 +212,8 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
   // 拖动结束：计算法线 + 同步 state（一次性）
   const finishDrawing = useCallback(() => {
+    console.log('[TerrainEditor] finishDrawing 开始')
+    
     // 确保最后一批脏数据刷入几何体
     if (rafIdRef.current) {
       cancelAnimationFrame(rafIdRef.current)
@@ -225,16 +229,32 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
     // 同步到 store（触发一次 React 更新，用于持久化/undo 等）
     const data = useStore.getState().terrainData
+    console.log('[TerrainEditor] 从 store 获取 terrainData:', data ? '存在' : 'null')
     if (data) {
+      console.log('[TerrainEditor] terrainData 详情:', {
+        resolution: data.resolution,
+        heightsLength: data.heights?.length,
+        maxHeight: data.maxHeight,
+        sampleHeights: data.heights ? Array.from(data.heights.slice(0, 5)) : null
+      })
+      
+      // 注意：这里需要确保 heights 是一个新的引用吗？
+      // 由于 heights 是 Float32Array，直接修改的是其内容
+      // 但为了确保 store 能检测到变化，我们需要确保对象引用变化
       useStore.getState().setTerrainData({
         resolution: data.resolution,
         heights: data.heights,
         maxHeight: data.maxHeight,
       })
+      
+      const state = useStore.getState()
+      console.log('[TerrainEditor] setTerrainData 后，store 中的 dirty:', state.dirty)
+      console.log('[TerrainEditor] setTerrainData 后，store 中的 terrainData:', state.terrainData ? '存在' : 'null')
     }
 
     heightsRef.current = null
     onHeightChange()
+    console.log('[TerrainEditor] finishDrawing 结束')
   }, [flushGeometry, geometryRef, onHeightChange])
 
   // 射线检测 → 世界坐标（使用对象池）

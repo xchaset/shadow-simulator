@@ -18,7 +18,10 @@ import {
   FolderOutlined,
   RiseOutlined,
   SelectOutlined,
+  EyeOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons'
+import { useStore } from '../../store/useStore'
 
 const { Text, Paragraph } = Typography
 
@@ -33,7 +36,67 @@ interface GuideItem {
   shortcuts?: { key: string; action: string }[]
 }
 
-const GUIDE_ITEMS: GuideItem[] = [
+const READ_ONLY_GUIDE_ITEMS: GuideItem[] = [
+  {
+    key: 'intro',
+    icon: <ShareAltOutlined />,
+    title: '关于此分享',
+    tag: '只读模式',
+    tagColor: 'blue',
+    desc: '这是一个只读的阴影模拟分享链接。您可以查看场景、观察日照阴影效果，但无法编辑建筑、地形或保存更改。',
+    tips: [
+      '所有编辑功能已禁用',
+      '如需编辑，请联系分享者获取原模型',
+    ],
+  },
+  {
+    key: 'view',
+    icon: <EyeOutlined />,
+    title: '视角控制',
+    tag: '3D 视图',
+    tagColor: 'orange',
+    desc: '在 3D 场景中调整视角，从不同角度观察场景。',
+    shortcuts: [
+      { key: '左键拖动', action: '旋转视角' },
+      { key: '右键拖动', action: '平移视角' },
+      { key: '滚轮', action: '缩放' },
+    ],
+  },
+  {
+    key: 'timeline',
+    icon: <CalendarOutlined />,
+    title: '日期控制',
+    tag: '左侧滑块',
+    tagColor: 'volcano',
+    desc: '拖动左侧垂直滑块选择一年中的日期，观察不同季节的日照变化。',
+  },
+  {
+    key: 'time',
+    icon: <ClockCircleOutlined />,
+    title: '时间控制',
+    tag: '底部滑块',
+    tagColor: 'volcano',
+    desc: '拖动底部水平滑块选择一天中的时刻，实时观察阴影变化。滑块上标注了日出和日落时间。',
+  },
+  {
+    key: 'playback',
+    icon: <CaretRightOutlined />,
+    title: '时间播放',
+    tag: '底部控制',
+    tagColor: 'volcano',
+    desc: '点击播放按钮自动推进时间，观察一天中阴影的动态变化。支持 1x ~ 30x 多种播放速度。',
+  },
+  {
+    key: 'sun',
+    icon: <AppstoreOutlined />,
+    title: '太阳信息',
+    tag: '顶部右侧',
+    tagColor: 'default',
+    desc: '实时显示当前日出时间、日落时间、日照时长、太阳高度角和方位角。夜间会显示"夜间"标识。',
+  },
+]
+
+const FULL_GUIDE_ITEMS: GuideItem[] = [
   {
     key: 'project',
     icon: <FolderOutlined />,
@@ -203,8 +266,16 @@ const GUIDE_ITEMS: GuideItem[] = [
 
 export function HelpButton() {
   const [open, setOpen] = useState(false)
+  const shareMode = useStore(s => s.shareMode)
+  const isReadOnly = shareMode.isReadOnly
 
-  const collapseItems = GUIDE_ITEMS.map(item => ({
+  const guideItems = isReadOnly ? READ_ONLY_GUIDE_ITEMS : FULL_GUIDE_ITEMS
+  const defaultActiveKey = isReadOnly ? ['intro'] : ['scene']
+  const introText = isReadOnly
+    ? '这是一个只读的阴影模拟分享链接。以下是您可以使用的功能说明。'
+    : '阴影模拟器用于模拟建筑物在不同时间、不同地点的日照阴影效果。以下是各功能模块的说明。'
+
+  const collapseItems = guideItems.map(item => ({
     key: item.key,
     label: (
       <Space size={8}>
@@ -264,7 +335,7 @@ export function HelpButton() {
     <>
       <FloatButton
         icon={<QuestionCircleOutlined />}
-        tooltip="功能帮助"
+        tooltip={isReadOnly ? '帮助' : '功能帮助'}
         onClick={() => setOpen(true)}
         style={{ right: 24, bottom: 64 }}
       />
@@ -273,7 +344,7 @@ export function HelpButton() {
         title={
           <Space>
             <QuestionCircleOutlined />
-            <span>功能介绍</span>
+            <span>{isReadOnly ? '帮助' : '功能介绍'}</span>
           </Space>
         }
         open={open}
@@ -283,13 +354,13 @@ export function HelpButton() {
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '12px 0' } }}
       >
         <Paragraph style={{ padding: '0 24px 8px', color: '#888', fontSize: 13 }}>
-          阴影模拟器用于模拟建筑物在不同时间、不同地点的日照阴影效果。以下是各功能模块的说明。
+          {introText}
         </Paragraph>
         <Collapse
           accordion
           ghost
           items={collapseItems}
-          defaultActiveKey={['scene']}
+          defaultActiveKey={defaultActiveKey}
         />
       </Modal>
     </>

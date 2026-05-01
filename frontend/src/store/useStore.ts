@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode } from '../types'
+import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode, ShadowAnalysisReport, MeasurementToolState, MeasurementMode, MeasurementPoint, MeasurementResult } from '../types'
 
 const MAX_UNDO = 20
 
@@ -198,4 +198,122 @@ export const useStore = create<AppState>((set, get) => ({
       dirty: true,
     })
   },
+
+  // Shadow Analysis
+  shadowAnalysisReport: null,
+  setShadowAnalysisReport: (report: ShadowAnalysisReport | null) =>
+    set({ shadowAnalysisReport: report }),
+  isGeneratingReport: false,
+  setIsGeneratingReport: (v: boolean) => set({ isGeneratingReport: v }),
+
+  // Measurement Tool
+  measurementTool: {
+    enabled: false,
+    mode: 'distance',
+    points: [],
+    results: [],
+    isDrawing: false,
+  } as MeasurementToolState,
+
+  setMeasurementTool: (updates: Partial<MeasurementToolState>) =>
+    set(state => ({
+      measurementTool: { ...state.measurementTool, ...updates },
+    })),
+
+  addMeasurementPoint: (point: MeasurementPoint) =>
+    set(state => ({
+      measurementTool: {
+        ...state.measurementTool,
+        points: [...state.measurementTool.points, point],
+      },
+    })),
+
+  removeMeasurementPoint: (id: string) =>
+    set(state => ({
+      measurementTool: {
+        ...state.measurementTool,
+        points: state.measurementTool.points.filter(p => p.id !== id),
+      },
+    })),
+
+  clearMeasurementPoints: () =>
+    set(state => ({
+      measurementTool: {
+        ...state.measurementTool,
+        points: [],
+      },
+    })),
+
+  completeMeasurement: () => {
+    const { measurementTool } = get()
+    const { mode, points } = measurementTool
+
+    if (points.length < 2) return
+
+    const result: MeasurementResult = {
+      id: `measurement-${Date.now()}`,
+      mode,
+      points: [...points],
+      createdAt: new Date(),
+    }
+
+    if (mode === 'distance' && points.length >= 2) {
+      let totalDistance = 0
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i]
+        const p2 = points[i + 1]
+        const dx = p2.position[0] - p1.position[0]
+        const dz = p2.position[1] - p1.position[1]
+        totalDistance += Math.sqrt(dx * dx + dz * dz)
+      }
+      result.distance = totalDistance
+    }
+
+    if (mode === 'area' && points.length >= 3) {
+      let area = 0
+      const n = points.length
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n
+        area += points[i].position[0] * points[j].position[1]
+        area -= points[j].position[0] * points[i].position[1]
+      }
+      result.area = Math.abs(area) / 2
+    }
+
+    set(state => ({
+      measurementTool: {
+        ...state.measurementTool,
+        points: [],
+        results: [...state.measurementTool.results, result],
+      },
+    }))
+  },
+
+  clearMeasurementResults: () =>
+    set(state => ({
+      measurementTool: {
+        ...state.measurementTool,
+        results: [],
+      },
+    })),
+
+  // Share Mode
+  shareMode: {
+    isShareMode: false,
+    shareToken: null,
+    isReadOnly: false,
+    shareData: null,
+  },
+  setShareMode: (updates: Partial<{
+    isShareMode: boolean
+    shareToken: string | null
+    isReadOnly: boolean
+    shareData: any
+  }>) =>
+    set(state => ({
+      shareMode: {
+        ...state.shareMode,
+        ...updates,
+      },
+    })),
 }))

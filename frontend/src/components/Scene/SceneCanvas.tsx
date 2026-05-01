@@ -11,6 +11,7 @@ import { SelectionBox } from '../Selection/SelectionBox'
 import { BoxSelectInteraction } from '../Selection/BoxSelectInteraction'
 import { CanvasSettings } from './CanvasSettings'
 import { TerrainEditor } from '../Terrain/TerrainEditor'
+import { MeasurementInteraction, MeasurementOverlay } from '../Measurement'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
 import { modelApi, recentModelApi } from '../../utils/api'
@@ -47,6 +48,7 @@ export function SceneCanvas() {
   const boxSelectStart = useStore(s => s.boxSelectStart)
   const boxSelectEnd = useStore(s => s.boxSelectEnd)
   const terrainEditor = useStore(s => s.terrainEditor)
+  const measurementTool = useStore(s => s.measurementTool)
   const setTerrainData = useStore(s => s.setTerrainData)
   const containerRef = useRef<HTMLDivElement>(null)
   const clipboardRef = useRef<ClipboardBuilding[] | null>(null)
@@ -62,7 +64,11 @@ export function SceneCanvas() {
   }, [setTerrainData, handleTerrainHeightChange])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    const { selectedBuildingId, selectedBuildingIds, buildings, updateBuilding } = useStore.getState()
+    const { selectedBuildingId, selectedBuildingIds, buildings, updateBuilding, shareMode } = useStore.getState()
+
+    if (shareMode.isReadOnly) {
+      return
+    }
 
     // 确定操作的建筑物 IDs（多选优先，否则单选）
     const activeIds = selectedBuildingIds.length > 0 ? selectedBuildingIds : (selectedBuildingId ? [selectedBuildingId] : [])
@@ -202,10 +208,13 @@ export function SceneCanvas() {
     return () => { cancelled = true }
   }, [])
 
+  const shareMode = useStore(s => s.shareMode)
+  const isReadOnly = shareMode.isReadOnly
+
   return (
     <div ref={containerRef} style={{ flex: 1, position: 'relative' }} tabIndex={-1}>
-      <FloatingEditor />
-      <CanvasSettings />
+      {!isReadOnly && <FloatingEditor />}
+      {!isReadOnly && <CanvasSettings />}
 
       <Canvas
         shadows
@@ -214,16 +223,18 @@ export function SceneCanvas() {
         <SkyBackground />
         <SunLight />
         <Ground
-          onClick={terrainEditor.enabled ? undefined : () => clearSelection()}
+          onClick={isReadOnly ? undefined : (terrainEditor.enabled || measurementTool.enabled ? undefined : () => clearSelection())}
           terrainRef={terrainRef}
         />
         <BuildingGroup />
-        <SelectionBox start={boxSelectStart} end={boxSelectEnd} />
-        <BoxSelectInteraction />
+        {!isReadOnly && <SelectionBox start={boxSelectStart} end={boxSelectEnd} />}
+        {!isReadOnly && <BoxSelectInteraction />}
+        {!isReadOnly && <MeasurementInteraction />}
+        {!isReadOnly && <MeasurementOverlay />}
         <Compass />
         <SunIndicator />
         <CameraControls />
-        {terrainEditor.enabled && <TerrainEditor geometryRef={terrainRef} onHeightChange={handleTerrainHeightChange} />}
+        {!isReadOnly && terrainEditor.enabled && <TerrainEditor geometryRef={terrainRef} onHeightChange={handleTerrainHeightChange} />}
       </Canvas>
     </div>
   )

@@ -3,6 +3,8 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore } from '../../store/useStore'
 
+const LOG_PREFIX = '[BoxSelectInteraction]'
+
 /**
  * 框选交互组件
  * Alt+左键拖拽选择建筑物
@@ -99,22 +101,43 @@ export function BoxSelectInteraction() {
     useStore.setState({ selectedBuildingIds: selectedIds, editorOpen: false })
   }, [isBuildingInBox, setBoxSelecting, setBoxSelectStart, setBoxSelectEnd])
 
-  /** Alt+左键 且 非地貌编辑模式 */
+  /** Alt+左键 且 非地貌编辑模式 且 非测量模式 */
   const shouldActivate = useCallback((e: PointerEvent) => {
-    return e.altKey && e.button === 0 && !useStore.getState().terrainEditor.enabled
+    const state = useStore.getState()
+    const result = e.altKey && e.button === 0 && !state.terrainEditor.enabled && !state.measurementTool.enabled
+    
+    console.log(LOG_PREFIX, 'shouldActivate:', {
+      altKey: e.altKey,
+      button: e.button,
+      terrainEnabled: state.terrainEditor.enabled,
+      measurementEnabled: state.measurementTool.enabled,
+      result
+    })
+    
+    return result
   }, [])
 
   useEffect(() => {
+    console.log(LOG_PREFIX, 'useEffect 注册事件监听')
+
     const onPointerDown = (e: PointerEvent) => {
+      console.log(LOG_PREFIX, 'onPointerDown', {
+        altKey: e.altKey,
+        button: e.button,
+        shouldActivate: shouldActivate(e)
+      })
+
       if (!shouldActivate(e)) return
       e.preventDefault()
       e.stopImmediatePropagation()
 
       isDraggingRef.current = true
       setBoxSelecting(true)
+      console.log(LOG_PREFIX, '开始框选')
 
       const w = screenToWorld(e.clientX, e.clientY)
       if (w) {
+        console.log(LOG_PREFIX, '框选起点:', w)
         setBoxSelectStart(w)
         setBoxSelectEnd(w)
       }
@@ -134,6 +157,7 @@ export function BoxSelectInteraction() {
       e.preventDefault()
       e.stopImmediatePropagation()
 
+      console.log(LOG_PREFIX, '结束框选')
       finishBoxSelect()
       isDraggingRef.current = false
       justFinishedRef.current = true
@@ -143,6 +167,7 @@ export function BoxSelectInteraction() {
     // 但部分浏览器仍可能派发 click，这里兜底拦截防止 Ground.onClick 清空选中
     const onClick = (e: MouseEvent) => {
       if (justFinishedRef.current) {
+        console.log(LOG_PREFIX, 'onClick 拦截')
         e.stopImmediatePropagation()
         e.preventDefault()
         justFinishedRef.current = false
@@ -150,15 +175,21 @@ export function BoxSelectInteraction() {
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') e.preventDefault()
+      if (e.key === 'Alt') {
+        console.log(LOG_PREFIX, 'onKeyDown: Alt 键按下')
+        e.preventDefault()
+      }
     }
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Alt' && isDraggingRef.current) {
-        setBoxSelecting(false)
-        setBoxSelectStart(null)
-        setBoxSelectEnd(null)
-        isDraggingRef.current = false
+      if (e.key === 'Alt') {
+        console.log(LOG_PREFIX, 'onKeyUp: Alt 键释放')
+        if (isDraggingRef.current) {
+          setBoxSelecting(false)
+          setBoxSelectStart(null)
+          setBoxSelectEnd(null)
+          isDraggingRef.current = false
+        }
       }
     }
 
@@ -170,6 +201,7 @@ export function BoxSelectInteraction() {
     window.addEventListener('keyup', onKeyUp)
 
     return () => {
+      console.log(LOG_PREFIX, 'useEffect 清理事件监听')
       window.removeEventListener('pointerdown', onPointerDown, true)
       window.removeEventListener('pointermove', onPointerMove, true)
       window.removeEventListener('pointerup', onPointerUp, true)

@@ -124,3 +124,10 @@ export const deleteModel: ValidationSchema = {
     id: commonRules.id,
   },
 }
+
+export const getVersion: ValidationSchema = {
+  params: {
+    id: commonRules.id,
+    versionId: commonRules.id,
+  },
+}

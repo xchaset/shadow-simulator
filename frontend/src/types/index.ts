@@ -114,7 +114,140 @@ export interface Model {
   updated_at: string
 }
 
+// ─── Measurement Types ─────────────────────────────────────
+
+export type MeasurementMode = 'distance' | 'area'
+
+export interface MeasurementPoint {
+  id: string
+  position: [x: number, z: number]
+  type: 'point' | 'building'
+  buildingId?: string
+  buildingName?: string
+}
+
+export interface MeasurementResult {
+  id: string
+  mode: MeasurementMode
+  points: MeasurementPoint[]
+  distance?: number
+  area?: number
+  createdAt: Date
+}
+
+export interface MeasurementToolState {
+  enabled: boolean
+  mode: MeasurementMode
+  points: MeasurementPoint[]
+  results: MeasurementResult[]
+  isDrawing: boolean
+}
+
 // ─── App State ────────────────────────────────────────────
+
+// ─── Shadow Analysis Types ────────────────────────────────
+
+export interface SolarTerm {
+  id: string
+  name: string
+  month: number
+  day: number
+  description: string
+}
+
+export interface DaylightAnalysisPoint {
+  time: Date
+  altitude: number
+  azimuth: number
+  isDaylight: boolean
+}
+
+export interface BuildingDaylightResult {
+  buildingId: string
+  buildingName: string
+  totalDaylightMinutes: number
+  daylightIntervals: Array<{
+    start: Date
+    end: Date
+    durationMinutes: number
+  }>
+  hourlyData: Array<{
+    hour: number
+    daylightMinutes: number
+  }>
+}
+
+export interface SolarTermDaylightAnalysis {
+  solarTerm: SolarTerm
+  date: Date
+  sunrise: Date
+  sunset: Date
+  totalDaylightMinutes: number
+  buildingResults: BuildingDaylightResult[]
+}
+
+export interface ShadowAnalysisReport {
+  id: string
+  generatedAt: Date
+  location: Location
+  buildingIds: string[]
+  solarTermAnalyses: SolarTermDaylightAnalysis[]
+  summary: {
+    avgDaylightMinutes: number
+    maxDaylightMinutes: number
+    minDaylightMinutes: number
+    bestSolarTerm: SolarTerm | null
+    worstSolarTerm: SolarTerm | null
+  }
+}
+
+export interface TemplateBuilding {
+  type: BuildingType
+  params: Record<string, number>
+  position: [x: number, z: number]
+  rotation: number
+  color: string
+}
+
+export interface BuildingTemplate {
+  id: string
+  name: string
+  category: string
+  description: string
+  icon: string
+  buildings: TemplateBuilding[]
+}
+
+// ─── Share Types ──────────────────────────────────────────
+
+export interface Share {
+  id: string
+  token: string
+  model_id: string | null
+  name: string
+  description: string
+  location_lat: number
+  location_lng: number
+  city_name: string
+  date_time: string
+  building_count: number
+  scene_data?: Building[]
+  canvas_size: number
+  show_grid: boolean
+  grid_divisions: number
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  expires_at: string | null
+  view_count: number
+  is_read_only: boolean
+  created_at: string
+}
+
+export interface ShareModeState {
+  isShareMode: boolean
+  shareToken: string | null
+  isReadOnly: boolean
+  shareData: Share | null
+}
 
 export interface AppState {
   // Scene
@@ -177,4 +310,23 @@ export interface AppState {
   pushTerrainUndo: () => void
   terrainUndo: () => void
   terrainRedo: () => void
+
+  // Shadow Analysis
+  shadowAnalysisReport: ShadowAnalysisReport | null
+  setShadowAnalysisReport: (report: ShadowAnalysisReport | null) => void
+  isGeneratingReport: boolean
+  setIsGeneratingReport: (v: boolean) => void
+
+  // Measurement Tool
+  measurementTool: MeasurementToolState
+  setMeasurementTool: (updates: Partial<MeasurementToolState>) => void
+  addMeasurementPoint: (point: MeasurementPoint) => void
+  removeMeasurementPoint: (id: string) => void
+  clearMeasurementPoints: () => void
+  completeMeasurement: () => void
+  clearMeasurementResults: () => void
+
+  // Share Mode
+  shareMode: ShareModeState
+  setShareMode: (mode: Partial<ShareModeState>) => void
 }
