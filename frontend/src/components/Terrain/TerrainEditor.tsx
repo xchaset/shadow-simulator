@@ -8,12 +8,10 @@ interface TerrainEditorProps {
   onHeightChange: () => void
 }
 
-// ── 对象池：避免拖动时高频 GC ──────────
 const _hitVec = new Vector3()
 const _groundPlane = new Plane(new Vector3(0, 1, 0), 0)
 const _screenVec = new Vector3()
 
-// ── 样式缓存：避免不必要的 DOM 更新 ──────────
 interface BrushStyleCache {
   display: string
   left: number
@@ -22,19 +20,6 @@ interface BrushStyleCache {
   height: number
 }
 
-/**
- * 地形编辑器
- *
- * 交互模式：Alt+左键 = 笔刷绘制，普通左键 = 正常旋转画布
- * 绘制时通过 window capture 阶段拦截 pointer 事件，阻止 OrbitControls 接收。
- * 笔刷光标始终跟随鼠标（不需要 Alt）。
- *
- * 性能优化：
- * - 局部顶点更新：只更新笔刷影响范围内的顶点
- * - RAF 批处理：多次 applyBrush 合并为一帧更新
- * - 延迟法线计算：拖动中跳过 computeVertexNormals，结束时算一次
- * - ref 直接操作：拖动中不触发 React 重渲染
- */
 export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProps) {
   const { camera, gl, raycaster } = useThree()
   const cameraRef = useRef(camera)
@@ -45,15 +30,13 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
   const setTerrainEditor = useStore(s => s.setTerrainEditor)
   const canvasSize = useStore(s => s.canvasSize)
 
-  // ── 批处理状态 ──────────
   const rafIdRef = useRef<number>(0)
-  // 脏区域边界 [minX, minY, maxX, maxY]，用于局部顶点更新
   const dirtyBoundsRef = useRef<[number, number, number, number]>([Infinity, Infinity, -Infinity, -Infinity])
-  // 拖动中直接引用 heights，不走 state
   const heightsRef = useRef<Float32Array | null>(null)
+  const waterMaskRef = useRef<Uint8Array | null>(null)
   const resolutionRef = useRef(128)
+  const isWaterBrushRef = useRef(false)
 
-  // ── 性能优化：缓存 DOM 元素和样式状态 ──────────
   const brushIndicatorRef = useRef<HTMLElement | null>(null)
   const lastStyleRef = useRef<BrushStyleCache>({
     display: 'none',
@@ -63,18 +46,17 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     height: 0,
   })
 
-  // 初始化地形数据
   useEffect(() => {
     if (!useStore.getState().terrainData) {
       useStore.getState().setTerrainData({
         resolution: 128,
         heights: new Float32Array(128 * 128),
         maxHeight: 50,
+        waterMask: new Uint8Array(128 * 128),
       })
     }
   }, [])
 
-  // 将世界坐标转换为高度图索引
   const worldToIndex = useCallback((wx: number, wz: number): [number, number] => {
     const halfSize = canvasSize / 2
     const u = (wx + halfSize) / canvasSize
@@ -84,7 +66,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     return [Math.max(0, Math.min(127, x)), Math.max(0, Math.min(127, y))]
   }, [canvasSize])
 
-  // 扩展脏区域
   const expandDirtyBounds = useCallback((cx: number, cy: number, radius: number) => {
     const b = dirtyBoundsRef.current
     b[0] = Math.min(b[0], cx - radius)
@@ -93,34 +74,40 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     b[3] = Math.max(b[3], cy + radius)
   }, [])
 
-  // 刷新几何体：只更新脏区域内的顶点
   const flushGeometry = useCallback(() => {
     const geometry = geometryRef.current
     const heights = heightsRef.current
-    if (!geometry || !heights) return
+    if (!geometry) return
 
     const [minX, minY, maxX, maxY] = dirtyBoundsRef.current
     const res = resolutionRef.current
     const pos = geometry.attributes.position
 
-    const x0 = Math.max(0, Math.floor(minX))
-    const y0 = Math.max(0, Math.floor(minY))
-    const x1 = Math.min(res - 1, Math.ceil(maxX))
-    const y1 = Math.min(res - 1, Math.ceil(maxY))
+    if (heights) {
+      const x0 = Math.max(0, Math.floor(minX))
+      const y0 = Math.max(0, Math.floor(minY))
+      const x1 = Math.min(res - 1, Math.ceil(maxX))
+      const y1 = Math.min(res - 1, Math.ceil(maxY))
 
-    for (let iy = y0; iy <= y1; iy++) {
-      for (let ix = x0; ix <= x1; ix++) {
-        const idx = iy * res + ix
-        pos.setZ(idx, heights[idx])
+      for (let iy = y0; iy <= y1; iy++) {
+        for (let ix = x0; ix <= x1; ix++) {
+          const idx = iy * res + ix
+          pos.setZ(idx, heights[idx])
+        }
       }
+      pos.needsUpdate = true
     }
-    pos.needsUpdate = true
 
-    // 重置脏区域
+    // 更新 waterMask 属性
+    const waterMask = waterMaskRef.current
+    if (waterMask && geometry.getAttribute('aWaterMask')) {
+      const maskAttr = geometry.getAttribute('aWaterMask') as any
+      maskAttr.needsUpdate = true
+    }
+
     dirtyBoundsRef.current = [Infinity, Infinity, -Infinity, -Infinity]
   }, [geometryRef])
 
-  // 调度 RAF 批量更新
   const scheduleFlush = useCallback(() => {
     if (rafIdRef.current) return
     rafIdRef.current = requestAnimationFrame(() => {
@@ -129,7 +116,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     })
   }, [flushGeometry])
 
-  // 应用笔刷（只修改 heights 数据 + 标记脏区域，不直接操作几何体）
   const applyBrush = useCallback((worldX: number, worldZ: number, isFirst: boolean) => {
     let data = useStore.getState().terrainData
     if (!data || !data.heights || data.heights.length === 0) {
@@ -137,25 +123,33 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
         resolution: 128,
         heights: new Float32Array(128 * 128),
         maxHeight: 50,
+        waterMask: new Uint8Array(128 * 128),
       }
       console.log('[TerrainEditor] 初始化地形数据:', newData)
       useStore.getState().setTerrainData(newData)
       data = newData
     }
 
+    if (!data.waterMask) {
+      data.waterMask = new Uint8Array(data.resolution * data.resolution)
+    }
+
     const { brushMode, brushRadius, brushStrength } = useStore.getState().terrainEditor
     const [cx, cy] = worldToIndex(worldX, worldZ)
     const radiusInIndices = Math.ceil((brushRadius / canvasSize) * 128)
+    const isWaterBrush = brushMode === 'water'
 
     if (isFirst) {
       console.log('[TerrainEditor] 开始绘制，模式:', brushMode, '位置:', [cx, cy], '半径:', radiusInIndices)
       useStore.getState().pushTerrainUndo()
-      // 拖动开始：缓存引用，后续直接操作
       heightsRef.current = data.heights as Float32Array
+      waterMaskRef.current = data.waterMask as Uint8Array
       resolutionRef.current = data.resolution
+      isWaterBrushRef.current = isWaterBrush
     }
 
     const heights = heightsRef.current || data.heights as Float32Array
+    const waterMask = waterMaskRef.current || data.waterMask as Uint8Array
     const resolution = resolutionRef.current || data.resolution
 
     for (let dy = -radiusInIndices; dy <= radiusInIndices; dy++) {
@@ -169,65 +163,67 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
         const falloff = Math.exp(-(dist * dist) / (2 * (radiusInIndices * 0.5) ** 2))
         const idx = iy * resolution + ix
-        const currentHeight = heights[idx]
 
-        switch (brushMode) {
-          case 'raise':
-            heights[idx] = Math.min(data.maxHeight, currentHeight + brushStrength * falloff)
-            break
-          case 'lower':
-            heights[idx] = Math.max(-data.maxHeight, currentHeight - brushStrength * falloff)
-            break
-          case 'smooth': {
-            let sum = 0
-            let count = 0
-            for (let sy = -1; sy <= 1; sy++) {
-              for (let sx = -1; sx <= 1; sx++) {
-                const niy = iy + sy
-                const nix = ix + sx
-                if (niy >= 0 && niy < resolution && nix >= 0 && nix < resolution) {
-                  sum += heights[niy * resolution + nix]
-                  count++
+        if (isWaterBrush) {
+          if (falloff > 0.3) {
+            waterMask[idx] = 1
+          }
+        } else {
+          const currentHeight = heights[idx]
+
+          switch (brushMode) {
+            case 'raise':
+              heights[idx] = Math.min(data.maxHeight, currentHeight + brushStrength * falloff)
+              break
+            case 'lower':
+              heights[idx] = Math.max(-data.maxHeight, currentHeight - brushStrength * falloff)
+              break
+            case 'smooth': {
+              let sum = 0
+              let count = 0
+              for (let sy = -1; sy <= 1; sy++) {
+                for (let sx = -1; sx <= 1; sx++) {
+                  const niy = iy + sy
+                  const nix = ix + sx
+                  if (niy >= 0 && niy < resolution && nix >= 0 && nix < resolution) {
+                    sum += heights[niy * resolution + nix]
+                    count++
+                  }
                 }
               }
+              const avg = sum / count
+              heights[idx] = currentHeight + (avg - currentHeight) * brushStrength * 0.1 * falloff
+              break
             }
-            const avg = sum / count
-            heights[idx] = currentHeight + (avg - currentHeight) * brushStrength * 0.1 * falloff
-            break
-          }
-          case 'flatten': {
-            const centerIdx = cy * resolution + cx
-            const targetHeight = heights[centerIdx]
-            heights[idx] = currentHeight + (targetHeight - currentHeight) * brushStrength * 0.1 * falloff
-            break
+            case 'flatten': {
+              const centerIdx = cy * resolution + cx
+              const targetHeight = heights[centerIdx]
+              heights[idx] = currentHeight + (targetHeight - currentHeight) * brushStrength * 0.1 * falloff
+              break
+            }
           }
         }
       }
     }
 
-    // 标记脏区域，调度批量更新
     expandDirtyBounds(cx, cy, radiusInIndices)
     scheduleFlush()
   }, [canvasSize, worldToIndex, expandDirtyBounds, scheduleFlush])
 
-  // 拖动结束：计算法线 + 同步 state（一次性）
   const finishDrawing = useCallback(() => {
     console.log('[TerrainEditor] finishDrawing 开始')
-    
-    // 确保最后一批脏数据刷入几何体
+
     if (rafIdRef.current) {
       cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = 0
     }
     flushGeometry()
 
-    // 拖动结束才计算法线（最昂贵的操作，只做一次）
     const geometry = geometryRef.current
     if (geometry) {
       geometry.computeVertexNormals()
     }
 
-    // 同步到 store（触发一次 React 更新，用于持久化/undo 等）
     const data = useStore.getState().terrainData
     console.log('[TerrainEditor] 从 store 获取 terrainData:', data ? '存在' : 'null')
     if (data) {
@@ -235,29 +231,27 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
         resolution: data.resolution,
         heightsLength: data.heights?.length,
         maxHeight: data.maxHeight,
-        sampleHeights: data.heights ? Array.from(data.heights.slice(0, 5)) : null
+        hasWaterMask: !!data.waterMask,
       })
-      
-      // 注意：这里需要确保 heights 是一个新的引用吗？
-      // 由于 heights 是 Float32Array，直接修改的是其内容
-      // 但为了确保 store 能检测到变化，我们需要确保对象引用变化
+
       useStore.getState().setTerrainData({
         resolution: data.resolution,
         heights: data.heights,
         maxHeight: data.maxHeight,
+        waterMask: data.waterMask,
       })
-      
+
       const state = useStore.getState()
       console.log('[TerrainEditor] setTerrainData 后，store 中的 dirty:', state.dirty)
       console.log('[TerrainEditor] setTerrainData 后，store 中的 terrainData:', state.terrainData ? '存在' : 'null')
     }
 
     heightsRef.current = null
+    waterMaskRef.current = null
     onHeightChange()
     console.log('[TerrainEditor] finishDrawing 结束')
   }, [flushGeometry, geometryRef, onHeightChange])
 
-  // 射线检测 → 世界坐标（使用对象池）
   const getWorldPosition = useCallback((event: { clientX: number; clientY: number }): [number, number] | null => {
     const rect = gl.domElement.getBoundingClientRect()
     const mouse = {
@@ -270,8 +264,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     }
     return null
   }, [gl, raycaster])
-
-  // ── 绘制事件（window capture 阶段，Alt+左键触发）──────────
 
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
@@ -297,7 +289,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       const pos = getWorldPosition(e)
       if (!pos) return
 
-      // 插值绘制，避免快速移动时出现断点
       if (lastPosRef.current) {
         const [lx, lz] = lastPosRef.current
         const [nx, nz] = pos
@@ -326,7 +317,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       finishDrawing()
     }
 
-    // Alt 释放时停止绘制
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt' && isDrawingRef.current) {
         isDrawingRef.current = false
@@ -346,7 +336,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       window.removeEventListener('pointermove', onPointerMove, true)
       window.removeEventListener('pointerup', onPointerUp, true)
       window.removeEventListener('keyup', onKeyUp)
-      // 清理未执行的 RAF
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current)
         rafIdRef.current = 0
@@ -354,14 +343,12 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     }
   }, [terrainEditor.enabled, getWorldPosition, applyBrush, setTerrainEditor, finishDrawing])
 
-  // ── 笔刷位置跟踪（仅在地形编辑启用时生效）──────────
-
   useEffect(() => {
     if (!terrainEditor.enabled) return
 
     const canvas = gl.domElement
     const onMove = (e: PointerEvent) => {
-      if (isDrawingRef.current) return // 绘制中由 capture handler 处理
+      if (isDrawingRef.current) return
       const pos = getWorldPosition(e)
       setTerrainEditor({ brushPosition: pos })
     }
@@ -369,15 +356,11 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     return () => canvas.removeEventListener('pointermove', onMove)
   }, [terrainEditor.enabled, gl.domElement, getWorldPosition, setTerrainEditor])
 
-  // ── 笔刷光标渲染 ──────────
-
   useFrame(() => {
     const { brushPosition, brushRadius, enabled } = useStore.getState().terrainEditor
 
-    // 快速检查：如果不需要显示笔刷，只在状态变化时隐藏
     if (!enabled || !brushPosition || isDrawingRef.current) {
       if (lastStyleRef.current.display !== 'none') {
-        // 延迟获取 DOM 元素，避免不必要的查询
         if (!brushIndicatorRef.current) {
           brushIndicatorRef.current = document.getElementById('terrain-brush-indicator')
         }
@@ -389,11 +372,9 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       return
     }
 
-    // 计算新位置和大小（相机移动时需要重新计算）
     _screenVec.set(brushPosition[0], 0, brushPosition[1])
     _screenVec.project(camera)
 
-    // 延迟获取 DOM 元素
     if (!brushIndicatorRef.current) {
       brushIndicatorRef.current = document.getElementById('terrain-brush-indicator')
     }
@@ -413,7 +394,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       height: pixelRadius * 2,
     }
 
-    // 只更新变化的样式，避免不必要的 DOM 操作
     const last = lastStyleRef.current
     if (last.display !== newStyle.display) {
       brushIndicatorRef.current.style.display = newStyle.display

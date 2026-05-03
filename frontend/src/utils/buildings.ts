@@ -140,5 +140,6 @@ export function createBuilding(type: BuildingType, position: [number, number] = 
     position,
     rotation: 0,
     color,
+    baseHeight: 0,
   }
 }

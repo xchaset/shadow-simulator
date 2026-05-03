@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Button, Input, Tree, Dropdown, Modal, message, Tooltip, Empty, Spin, Select, Upload, Descriptions,
+  Form, Radio,
 } from 'antd'
 import type { InputRef } from 'antd'
 import {
@@ -9,10 +10,14 @@ import {
   ExclamationCircleOutlined, FolderAddOutlined,
   CopyOutlined, DragOutlined, ExportOutlined, ImportOutlined,
   InboxOutlined, CheckOutlined, ReloadOutlined,
+  MergeOutlined, AppstoreAddOutlined,
 } from '@ant-design/icons'
 import type { TreeDataNode } from 'antd'
 import { useStore } from '../../store/useStore'
-import { directoryApi, modelApi, recentModelApi, modelVersionApi, type ModelVersionDTO } from '../../utils/api'
+import {
+  directoryApi, modelApi, recentModelApi, modelVersionApi,
+  mergeApi, type ModelVersionDTO, type MergeModelsParams,
+} from '../../utils/api'
 import { saveState } from '../../utils/storage'
 import {
   exportModel,
@@ -90,6 +95,25 @@ export function ProjectSidebar() {
     versions: [],
     loading: false,
   })
+
+  // Multi-select and merge state
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
+  const [mergeModal, setMergeModal] = useState<{
+    open: boolean
+    selectedModelIds: string[]
+    loading: boolean
+  }>({
+    open: false,
+    selectedModelIds: [],
+    loading: false,
+  })
+  const [mergeForm] = Form.useForm<{
+    name: string
+    description: string
+    mergeType: 'model' | 'template'
+    target_directory_id: string
+    template_category: string
+  }>()
 
   // 加载最近打开的模型详情
   const loadRecentModels = useCallback(async () => {
@@ -431,6 +455,102 @@ export function ProjectSidebar() {
       loadSceneFromModel(model)
     } catch (err: any) {
       message.error('加载模型失败: ' + err.message)
+    }
+  }
+
+  // ─── Multi-select and merge operations ───────────────────
+
+  const handleToggleModelSelection = (modelId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedModelIds(prev =>
+        prev.includes(modelId)
+          ? prev.filter(id => id !== modelId)
+          : [...prev, modelId]
+      )
+    } else {
+      if (selectedModelIds.length > 0 && !selectedModelIds.includes(modelId)) {
+        setSelectedModelIds([modelId])
+      } else {
+        setSelectedModelIds(prev =>
+          prev.length === 1 && prev[0] === modelId ? [] : [modelId]
+        )
+      }
+    }
+  }
+
+  const handleOpenMergeModal = () => {
+    if (selectedModelIds.length < 2) {
+      message.warning('请至少选择 2 个模型进行合并')
+      return
+    }
+
+    const selectedModels: Model[] = []
+    for (const dirId of Object.keys(models)) {
+      for (const model of models[dirId]) {
+        if (selectedModelIds.includes(model.id)) {
+          selectedModels.push(model)
+        }
+      }
+    }
+
+    const defaultName = selectedModels.map(m => m.name).join(' + ')
+    const firstDirId = selectedModels[0]?.directory_id || directories[0]?.id
+
+    mergeForm.setFieldsValue({
+      name: defaultName,
+      description: `合并自 ${selectedModels.length} 个模型：${selectedModels.map(m => m.name).join(', ')}`,
+      mergeType: 'model',
+      target_directory_id: firstDirId,
+      template_category: '自定义模板',
+    })
+
+    setMergeModal({
+      open: true,
+      selectedModelIds: [...selectedModelIds],
+      loading: false,
+    })
+  }
+
+  const handleCloseMergeModal = () => {
+    setMergeModal({
+      open: false,
+      selectedModelIds: [],
+      loading: false,
+    })
+    mergeForm.resetFields()
+  }
+
+  const handleMergeConfirm = async () => {
+    try {
+      const values = await mergeForm.validateFields()
+      setMergeModal(prev => ({ ...prev, loading: true }))
+
+      const params: MergeModelsParams = {
+        model_ids: mergeModal.selectedModelIds,
+        name: values.name,
+        description: values.description,
+        target_directory_id: values.target_directory_id,
+        save_as_template: values.mergeType === 'template',
+        template_category: values.template_category,
+      }
+
+      const result = await mergeApi.mergeModels(params)
+
+      if (result.type === 'model') {
+        message.success(`已成功合并为新模型「${result.data.name}」`)
+        await fetchDirectories()
+        setSelectedModelIds([])
+      } else {
+        message.success(`已成功合并为自定义模板「${result.data.name}」`)
+        setSelectedModelIds([])
+      }
+
+      handleCloseMergeModal()
+    } catch (err: any) {
+      message.error('合并失败: ' + err.message)
+    } finally {
+      setMergeModal(prev => ({ ...prev, loading: false }))
     }
   }
 
@@ -785,73 +905,149 @@ export function ProjectSidebar() {
       </Dropdown>
     ),
     icon: null,
-    children: (models[dir.id] || []).map(model => ({
-      key: `model-${model.id}`,
-      title: renaming?.type === 'model' && renaming.id === model.id ? (
-        <Input
-          ref={renameInputRef}
-          size="small"
-          defaultValue={model.name}
-          onBlur={handleRenameConfirm}
-          onPressEnter={() => { if (!composingRef.current) handleRenameConfirm() }}
-          onKeyDown={e => {
-            if (e.key === 'Escape') handleCancelRename()
-            e.stopPropagation()
-          }}
-          onCompositionStart={() => { composingRef.current = true }}
-          onCompositionEnd={() => { composingRef.current = false }}
-          autoFocus
-          style={{ width: 120 }}
-          onClick={e => e.stopPropagation()}
-        />
-      ) : (
-        <Dropdown
-          menu={{
-            items: [
-              { key: 'rename', icon: <EditOutlined />, label: '重命名',
-                onClick: () => { setRenaming({ type: 'model', id: model.id }) } },
-              { key: 'copy', icon: <CopyOutlined />, label: '复制模型',
-                onClick: () => handleCopyModel(model) },
-              { key: 'move', icon: <DragOutlined />, label: '移动到…',
-                disabled: directories.length < 2,
-                onClick: () => {
-                  setMoveTargetDirId(null)
-                  setMoveModal({ type: 'model', id: model.id, currentDirId: model.directory_id })
-                } },
-              { key: 'export', icon: <ExportOutlined />, label: '导出模型',
-                onClick: () => handleExportModel(model) },
-              { key: 'history', icon: <ReloadOutlined />, label: '历史版本',
-                onClick: () => handleOpenHistoryModal(model) },
-              { type: 'divider' },
-              { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
-                onClick: () => handleDeleteModel(model) },
-            ],
-          }}
-          trigger={['contextMenu']}
-        >
-          <span
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4, width: '100%',
-              fontWeight: currentModelId === model.id ? 600 : 400,
-              color: currentModelId === model.id ? '#1677ff' : undefined,
+    children: (models[dir.id] || []).map(model => {
+      const isSelected = selectedModelIds.includes(model.id)
+      const isCurrent = currentModelId === model.id
+      const hasMultipleSelected = selectedModelIds.length >= 2
+
+      const getMenuItems = () => {
+        const items: any[] = []
+
+        if (hasMultipleSelected) {
+          items.push(
+            { key: 'merge', icon: <MergeOutlined />, label: '合并模型',
+              onClick: () => handleOpenMergeModal() },
+            { key: 'merge-as-template', icon: <AppstoreAddOutlined />, label: '合并并加入基础模型',
+              onClick: () => {
+                setMergeModal({
+                  open: true,
+                  selectedModelIds: [...selectedModelIds],
+                  loading: false,
+                })
+                const selectedModels: Model[] = []
+                for (const dId of Object.keys(models)) {
+                  for (const m of models[dId]) {
+                    if (selectedModelIds.includes(m.id)) {
+                      selectedModels.push(m)
+                    }
+                  }
+                }
+                mergeForm.setFieldsValue({
+                  name: selectedModels.map(m => m.name).join(' + '),
+                  description: `合并自 ${selectedModels.length} 个模型：${selectedModels.map(m => m.name).join(', ')}`,
+                  mergeType: 'template',
+                  target_directory_id: selectedModels[0]?.directory_id || directories[0]?.id,
+                  template_category: '自定义模板',
+                })
+              }},
+            { type: 'divider' },
+          )
+        }
+
+        if (selectedModelIds.length === 1 && isSelected) {
+          items.push(
+            { key: 'rename', icon: <EditOutlined />, label: '重命名',
+              onClick: () => { setRenaming({ type: 'model', id: model.id }) } },
+            { key: 'copy', icon: <CopyOutlined />, label: '复制模型',
+              onClick: () => handleCopyModel(model) },
+            { key: 'move', icon: <DragOutlined />, label: '移动到…',
+              disabled: directories.length < 2,
+              onClick: () => {
+                setMoveTargetDirId(null)
+                setMoveModal({ type: 'model', id: model.id, currentDirId: model.directory_id })
+              } },
+            { key: 'export', icon: <ExportOutlined />, label: '导出模型',
+              onClick: () => handleExportModel(model) },
+            { key: 'history', icon: <ReloadOutlined />, label: '历史版本',
+              onClick: () => handleOpenHistoryModal(model) },
+            { type: 'divider' },
+            { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
+              onClick: () => handleDeleteModel(model) },
+          )
+        } else {
+          items.push(
+            { key: 'rename', icon: <EditOutlined />, label: '重命名',
+              onClick: () => { setRenaming({ type: 'model', id: model.id }) } },
+            { key: 'copy', icon: <CopyOutlined />, label: '复制模型',
+              onClick: () => handleCopyModel(model) },
+            { key: 'move', icon: <DragOutlined />, label: '移动到…',
+              disabled: directories.length < 2,
+              onClick: () => {
+                setMoveTargetDirId(null)
+                setMoveModal({ type: 'model', id: model.id, currentDirId: model.directory_id })
+              } },
+            { key: 'export', icon: <ExportOutlined />, label: '导出模型',
+              onClick: () => handleExportModel(model) },
+            { key: 'history', icon: <ReloadOutlined />, label: '历史版本',
+              onClick: () => handleOpenHistoryModal(model) },
+            { type: 'divider' },
+            { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true,
+              onClick: () => handleDeleteModel(model) },
+          )
+        }
+
+        return items
+      }
+
+      return {
+        key: `model-${model.id}`,
+        title: renaming?.type === 'model' && renaming.id === model.id ? (
+          <Input
+            ref={renameInputRef}
+            size="small"
+            defaultValue={model.name}
+            onBlur={handleRenameConfirm}
+            onPressEnter={() => { if (!composingRef.current) handleRenameConfirm() }}
+            onKeyDown={e => {
+              if (e.key === 'Escape') handleCancelRename()
+              e.stopPropagation()
             }}
-            onDoubleClick={(e) => { e.stopPropagation(); handleModelDblClick(model.id) }}
+            onCompositionStart={() => { composingRef.current = true }}
+            onCompositionEnd={() => { composingRef.current = false }}
+            autoFocus
+            style={{ width: 120 }}
+            onClick={e => e.stopPropagation()}
+          />
+        ) : (
+          <Dropdown
+            menu={{ items: getMenuItems() }}
+            trigger={['contextMenu']}
           >
-            <FileOutlined style={{ color: currentModelId === model.id ? '#1677ff' : '#8c8c8c' }} />
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {model.name}
-            </span>
-            {model.building_count > 0 && (
-              <span style={{ color: '#bbb', fontSize: 10, flexShrink: 0 }}>
-                {model.building_count}栋
+            <span
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+                fontWeight: isCurrent ? 600 : 400,
+                color: isCurrent ? '#1677ff' : undefined,
+                background: isSelected ? '#e6f4ff' : 'transparent',
+                borderRadius: 4,
+                padding: '0 2px',
+                margin: '0 -2px',
+              }}
+              onDoubleClick={(e) => { e.stopPropagation(); handleModelDblClick(model.id) }}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleToggleModelSelection(model.id, e)
+              }}
+            >
+              <FileOutlined style={{ color: isCurrent ? '#1677ff' : '#8c8c8c' }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {model.name}
               </span>
-            )}
-          </span>
-        </Dropdown>
-      ),
-      icon: null,
-      isLeaf: true,
-    })),
+              {model.building_count > 0 && (
+                <span style={{ color: '#bbb', fontSize: 10, flexShrink: 0 }}>
+                  {model.building_count}栋
+                </span>
+              )}
+              {isSelected && (
+                <CheckOutlined style={{ color: '#1677ff', fontSize: 12, flexShrink: 0 }} />
+              )}
+            </span>
+          </Dropdown>
+        ),
+        icon: null,
+        isLeaf: true,
+      }
+    }),
   }))
 
   // ─── Collapsed view ────────────────────────────────────
@@ -961,14 +1157,23 @@ export function ProjectSidebar() {
               treeData={treeData}
               expandedKeys={expandedKeys}
               onExpand={(keys) => setExpandedKeys(keys as string[])}
-              onSelect={(keys) => {
+              onSelect={(keys, info) => {
                 const key = keys[0] as string
                 if (!key) return
                 if (key.startsWith('model-')) {
-                  handleSelectModel(key.replace('model-', ''))
+                  const modelId = key.replace('model-', '')
+                  const e = info.node.props as any
+                  if (!e.ctrlKey && !e.metaKey) {
+                    if (selectedModelIds.length === 1 && selectedModelIds[0] === modelId) {
+                      handleSelectModel(modelId)
+                    }
+                  }
                 }
               }}
-              selectedKeys={currentModelId ? [`model-${currentModelId}`] : []}
+              selectedKeys={[
+                ...(currentModelId ? [`model-${currentModelId}`] : []),
+                ...selectedModelIds.map(id => `model-${id}`),
+              ]}
               showIcon={false}
               blockNode
               style={{ background: 'transparent' }}
@@ -1262,6 +1467,140 @@ export function ProjectSidebar() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Merge Models Modal */}
+      <Modal
+        title="🔗 合并模型"
+        open={mergeModal.open}
+        onOk={handleMergeConfirm}
+        onCancel={handleCloseMergeModal}
+        confirmLoading={mergeModal.loading}
+        okText="确认合并"
+        cancelText="取消"
+        width={550}
+      >
+        <Form form={mergeForm} layout="vertical">
+          <Form.Item
+            name="name"
+            label="新模型名称"
+            rules={[{ required: true, message: '请输入新模型名称' }]}
+          >
+            <Input placeholder="请输入新模型名称" />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="描述"
+          >
+            <Input.TextArea placeholder="请输入描述（可选）" rows={3} />
+          </Form.Item>
+
+          <Form.Item
+            name="mergeType"
+            label="合并方式"
+            rules={[{ required: true, message: '请选择合并方式' }]}
+          >
+            <Radio.Group>
+              <Radio value="model">
+                <span style={{ fontWeight: 500 }}>合并为新模型</span>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                  创建一个新的模型文件，包含所有选中模型的建筑数据
+                </div>
+              </Radio>
+              <Radio value="template" style={{ marginTop: 8 }}>
+                <span style={{ fontWeight: 500 }}>合并并加入基础模型</span>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                  创建一个自定义模板，可在顶部工具栏快速使用
+                </div>
+              </Radio>
+            </Radio.Group>
+          </Form.Item>
+
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, curr) => prev.mergeType !== curr.mergeType}
+          >
+            {({ getFieldValue }) => {
+              const mergeType = getFieldValue('mergeType')
+              if (mergeType === 'model') {
+                return (
+                  <Form.Item
+                    name="target_directory_id"
+                    label="目标目录"
+                    rules={[{ required: true, message: '请选择目标目录' }]}
+                  >
+                    <Select
+                      placeholder="请选择目标目录"
+                      options={directories.map(d => ({
+                        value: d.id,
+                        label: `${d.name} (${models[d.id]?.length || 0} 个模型)`,
+                      }))}
+                    />
+                  </Form.Item>
+                )
+              }
+              if (mergeType === 'template') {
+                return (
+                  <Form.Item
+                    name="template_category"
+                    label="模板分类"
+                    rules={[{ required: true, message: '请输入模板分类' }]}
+                  >
+                    <Input placeholder="例如：自定义模板、建筑群" />
+                  </Form.Item>
+                )
+              }
+              return null
+            }}
+          </Form.Item>
+
+          <div style={{
+            padding: '12px 16px',
+            background: '#f6f8fa',
+            borderRadius: 8,
+            fontSize: 12,
+            color: '#666',
+            marginTop: 8,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              📋 已选中 {mergeModal.selectedModelIds.length} 个模型
+            </div>
+            <div style={{
+              maxHeight: 100,
+              overflow: 'auto',
+              marginTop: 8,
+            }}>
+              {(function() {
+                const selectedModels: Model[] = []
+                for (const dId of Object.keys(models)) {
+                  for (const m of models[dId]) {
+                    if (mergeModal.selectedModelIds.includes(m.id)) {
+                      selectedModels.push(m)
+                    }
+                  }
+                }
+                return selectedModels.map((m, i) => (
+                  <div key={m.id} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '4px 0',
+                    borderBottom: i < selectedModels.length - 1 ? '1px solid #e8e8e8' : 'none',
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <FileOutlined style={{ color: '#8c8c8c' }} />
+                      <span>{m.name}</span>
+                    </span>
+                    <span style={{ color: '#999', fontSize: 11 }}>
+                      {m.building_count || 0} 栋
+                    </span>
+                  </div>
+                ))
+              })()}
+            </div>
+          </div>
+        </Form>
       </Modal>
 
       {/* History Versions Modal */}

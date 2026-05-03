@@ -156,4 +156,24 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_shares_model ON shares(model_id);
 `)
 
+// ─── Migration: Add custom_templates table for merged templates ─────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS custom_templates (
+    id               TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    description      TEXT DEFAULT '',
+    category         TEXT DEFAULT '自定义模板',
+    icon             TEXT DEFAULT 'custom',
+    source_model_ids TEXT DEFAULT '[]',
+    buildings        TEXT NOT NULL DEFAULT '[]',
+    sort_order       INTEGER DEFAULT 0,
+    created_at       TEXT DEFAULT (datetime('now', 'localtime')),
+    updated_at       TEXT DEFAULT (datetime('now', 'localtime'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_custom_templates_category ON custom_templates(category);
+  CREATE INDEX IF NOT EXISTS idx_custom_templates_sort ON custom_templates(sort_order);
+`)
+
 export default db

@@ -1,4 +1,4 @@
-import type { Building } from '../types'
+import type { Building, CustomTemplate, Model } from '../types'
 
 const API_BASE = '/api'
 
@@ -266,6 +266,102 @@ export const shareApi = {
 
   delete: (token: string) =>
     request<{ success: boolean }>(`/shares/${token}`, {
+      method: 'DELETE',
+    }),
+}
+
+// ─── Merge Models API ──────────────────────────────────────
+
+export interface MergeModelsParams {
+  model_ids: string[]
+  name: string
+  description?: string
+  target_directory_id: string
+  save_as_template?: boolean
+  template_category?: string
+}
+
+export interface MergeResultModel {
+  type: 'model'
+  data: ModelDTO
+}
+
+export interface MergeResultTemplate {
+  type: 'template'
+  data: CustomTemplate
+}
+
+export type MergeResult = MergeResultModel | MergeResultTemplate
+
+export const mergeApi = {
+  mergeModels: (params: MergeModelsParams) =>
+    request<MergeResult>('/models/merge', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+}
+
+// ─── Custom Templates API ──────────────────────────────────
+
+export interface CreateCustomTemplateParams {
+  name: string
+  description?: string
+  category?: string
+  icon?: string
+  source_model_ids?: string[]
+  buildings: Array<{
+    type: string
+    params: Record<string, number>
+    position: [number, number]
+    rotation: number
+    color: string
+  }>
+  sort_order?: number
+}
+
+export interface UpdateCustomTemplateParams {
+  name?: string
+  description?: string
+  category?: string
+  icon?: string
+  buildings?: Array<{
+    type: string
+    params: Record<string, number>
+    position: [number, number]
+    rotation: number
+    color: string
+  }>
+  sort_order?: number
+}
+
+export const customTemplateApi = {
+  list: (category?: string) => {
+    const url = category
+      ? `/custom-templates?category=${encodeURIComponent(category)}`
+      : '/custom-templates'
+    return request<CustomTemplate[]>(url)
+  },
+
+  listCategories: () =>
+    request<string[]>('/custom-templates/categories'),
+
+  get: (id: string) =>
+    request<CustomTemplate>(`/custom-templates/${id}`),
+
+  create: (params: CreateCustomTemplateParams) =>
+    request<CustomTemplate>('/custom-templates', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  update: (id: string, params: UpdateCustomTemplateParams) =>
+    request<CustomTemplate>(`/custom-templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(params),
+    }),
+
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/custom-templates/${id}`, {
       method: 'DELETE',
     }),
 }

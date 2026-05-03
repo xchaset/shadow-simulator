@@ -276,7 +276,7 @@ export function RiverMesh({ building }: Props) {
   return (
     <group
       ref={groupRef}
-      position={[building.position[0], 0, building.position[1]]}
+      position={[building.position[0], building.baseHeight ?? 0, building.position[1]]}
       rotation={[0, (building.rotation * Math.PI) / 180, 0]}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}

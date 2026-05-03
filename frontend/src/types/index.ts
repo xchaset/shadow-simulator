@@ -25,6 +25,7 @@ export interface Building {
   position: [x: number, z: number]
   rotation: number
   color: string
+  baseHeight?: number
   glbUrl?: string  // GLB 模型文件 URL（仅 type='glb' 时使用）
   glbScale?: number  // GLB 模型缩放比例（默认 1）
 }
@@ -50,7 +51,7 @@ export interface PlaybackState {
 
 // ─── Terrain Types ────────────────────────────────────────
 
-export type TerrainBrushMode = 'raise' | 'lower' | 'smooth' | 'flatten'
+export type TerrainBrushMode = 'raise' | 'lower' | 'smooth' | 'flatten' | 'water'
 
 export interface TerrainData {
   /** 高度图分辨率（如 64, 128, 256） */
@@ -59,6 +60,8 @@ export interface TerrainData {
   heights: Float32Array | number[]
   /** 最大高度（米） */
   maxHeight: number
+  /** 水标记，0=不是水，1=是水（笔刷绘制的湖泊区域） */
+  waterMask?: Uint8Array | number[]
 }
 
 export interface TerrainEditorState {
@@ -78,6 +81,33 @@ export interface TerrainEditorState {
   undoStack: TerrainData[]
   /** 重做栈 */
   redoStack: TerrainData[]
+}
+
+// ─── Lake Types ────────────────────────────────────────────
+
+export interface LakeState {
+  /** 是否启用湖泊 */
+  enabled: boolean
+  /** 水位高度（相对于0平面，负值表示低于地面） */
+  waterLevel: number
+  /** 水的颜色 */
+  waterColor: string
+  /** 波浪高度 */
+  waveHeight: number
+  /** 不透明度 */
+  opacity: number
+}
+
+/** 一个被水填充的区域（湖泊/池塘） */
+export interface LakeRegion {
+  /** 区域ID */
+  id: string
+  /** 该区域所有被水覆盖的网格点索引 */
+  indices: number[]
+  /** 边界顶点（用于生成网格） */
+  boundary: [number, number][]
+  /** 水位高度 */
+  waterLevel: number
 }
 
 // ─── Project Types ────────────────────────────────────────
@@ -207,6 +237,10 @@ export interface TemplateBuilding {
   position: [x: number, z: number]
   rotation: number
   color: string
+  name?: string
+  baseHeight?: number
+  glbUrl?: string
+  glbScale?: number
 }
 
 export interface BuildingTemplate {
@@ -216,6 +250,19 @@ export interface BuildingTemplate {
   description: string
   icon: string
   buildings: TemplateBuilding[]
+}
+
+export interface CustomTemplate {
+  id: string
+  name: string
+  description: string
+  category: string
+  icon: string
+  source_model_ids: string[]
+  buildings: TemplateBuilding[]
+  sort_order: number
+  created_at: string
+  updated_at: string
 }
 
 // ─── Share Types ──────────────────────────────────────────
@@ -247,6 +294,11 @@ export interface ShareModeState {
   shareToken: string | null
   isReadOnly: boolean
   shareData: Share | null
+}
+
+export interface CustomTemplateState {
+  templates: CustomTemplate[]
+  refreshTrigger: number
 }
 
 export interface AppState {
@@ -311,6 +363,15 @@ export interface AppState {
   terrainUndo: () => void
   terrainRedo: () => void
 
+  // Lake
+  lake: LakeState
+  setLake: (updates: Partial<LakeState>) => void
+  lakeRegions: LakeRegion[]
+  addLakeRegion: (region: LakeRegion) => void
+  removeLakeRegion: (id: string) => void
+  clearLakeRegions: () => void
+  setLakeRegions: (regions: LakeRegion[]) => void
+
   // Shadow Analysis
   shadowAnalysisReport: ShadowAnalysisReport | null
   setShadowAnalysisReport: (report: ShadowAnalysisReport | null) => void
@@ -329,4 +390,10 @@ export interface AppState {
   // Share Mode
   shareMode: ShareModeState
   setShareMode: (mode: Partial<ShareModeState>) => void
+
+  // Custom Templates
+  customTemplates: CustomTemplate[]
+  setCustomTemplates: (templates: CustomTemplate[]) => void
+  triggerCustomTemplateRefresh: () => void
+  customTemplateRefreshTrigger: number
 }

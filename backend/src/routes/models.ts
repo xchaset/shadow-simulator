@@ -498,4 +498,167 @@ router.delete('/models/:id/versions/:versionId', validate(schema.getVersion), (r
   res.json({ success: true })
 })
 
+// ─── POST /api/models/merge ────────────────────────────────
+router.post('/models/merge', validate(schema.mergeModels), (req, res) => {
+  const {
+    model_ids, name, description, target_directory_id,
+    save_as_template, template_category,
+  } = req.body
+  
+  // 验证所有模型都存在
+  const placeholders = model_ids.map(() => '?').join(',')
+  const models = db.prepare(`
+    SELECT id, directory_id, name, description, location_lat, location_lng,
+           city_name, date_time, building_count, scene_data, canvas_size,
+           show_grid, grid_divisions, terrain_data, sort_order
+    FROM models
+    WHERE id IN (${placeholders})
+    ORDER BY created_at ASC
+  `).all(...model_ids) as any[]
+  
+  if (models.length !== model_ids.length) {
+    const foundIds = models.map(m => m.id)
+    const missingIds = model_ids.filter((id: string) => !foundIds.includes(id))
+    res.status(404).json({ error: '部分模型不存在', missing_ids: missingIds })
+    return
+  }
+  
+  // 合并建筑数据
+  const allBuildings: any[] = []
+  const usedIds = new Set<string>()
+  
+  for (const model of models) {
+    let buildings: any[] = []
+    if (typeof model.scene_data === 'string') {
+      try { buildings = JSON.parse(model.scene_data) } catch { buildings = [] }
+    } else if (Array.isArray(model.scene_data)) {
+      buildings = model.scene_data
+    }
+    
+    for (const building of buildings) {
+      // 确保建筑ID唯一
+      let buildingId = building.id
+      if (usedIds.has(buildingId)) {
+        buildingId = `building-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      }
+      usedIds.add(buildingId)
+      allBuildings.push({ ...building, id: buildingId })
+    }
+  }
+  
+  if (save_as_template) {
+    // 保存为自定义模板
+    const templateId = uuidv4()
+    const buildingsStr = JSON.stringify(allBuildings)
+    const sourceModelIdsStr = JSON.stringify(model_ids)
+    
+    db.prepare(`
+      INSERT INTO custom_templates (
+        id, name, description, category, icon, source_model_ids, buildings, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      templateId,
+      name,
+      description || '',
+      template_category || '自定义模板',
+      'custom',
+      sourceModelIdsStr,
+      buildingsStr,
+      0,
+    )
+    
+    const templateRow = db.prepare(`
+      SELECT id, name, description, category, icon, source_model_ids, buildings, sort_order, created_at, updated_at
+      FROM custom_templates
+      WHERE id = ?
+    `).get(templateId)
+    
+    function parseTemplateRow(row: any) {
+      if (!row) return row
+      if (typeof row.buildings === 'string') {
+        try { row.buildings = JSON.parse(row.buildings) } catch { row.buildings = [] }
+      }
+      if (typeof row.source_model_ids === 'string') {
+        try { row.source_model_ids = JSON.parse(row.source_model_ids) } catch { row.source_model_ids = [] }
+      }
+      return row
+    }
+    
+    res.status(201).json({
+      type: 'template',
+      data: parseTemplateRow(templateRow),
+    })
+  } else {
+    // 创建为新模型
+    const targetDir = db.prepare('SELECT id FROM directories WHERE id = ?').get(target_directory_id)
+    if (!targetDir) {
+      res.status(404).json({ error: '目标目录不存在' })
+      return
+    }
+    
+    const newId = uuidv4()
+    const { str: sceneStr, count: buildingCount } = normalizeSceneData(allBuildings)
+    const dt = new Date().toISOString()
+    
+    // 使用第一个模型的设置作为基础
+    const firstModel = models[0]
+    const terrainStr = firstModel.terrain_data ? serializeTerrainData(
+      typeof firstModel.terrain_data === 'string' 
+        ? JSON.parse(firstModel.terrain_data) 
+        : firstModel.terrain_data
+    ) : null
+    
+    const showGridValue = firstModel.show_grid !== undefined 
+      ? (firstModel.show_grid ? 1 : 0) 
+      : 1
+    
+    db.prepare(`
+      INSERT INTO models (
+        id, directory_id, name, description, location_lat, location_lng,
+        city_name, date_time, building_count, scene_data, sort_order,
+        canvas_size, show_grid, grid_divisions, terrain_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId,
+      target_directory_id,
+      name,
+      description || '',
+      firstModel.location_lat ?? 39.9042,
+      firstModel.location_lng ?? 116.4074,
+      firstModel.city_name || '北京',
+      dt,
+      buildingCount,
+      sceneStr,
+      0,
+      firstModel.canvas_size ?? 2000,
+      showGridValue,
+      firstModel.grid_divisions ?? 200,
+      terrainStr,
+    )
+    
+    // 创建初始版本快照
+    createVersionSnapshot(newId, {
+      name,
+      description: description || '',
+      location_lat: firstModel.location_lat ?? 39.9042,
+      location_lng: firstModel.location_lng ?? 116.4074,
+      city_name: firstModel.city_name || '北京',
+      date_time: dt,
+      building_count: buildingCount,
+      scene_data: sceneStr,
+      canvas_size: firstModel.canvas_size ?? 2000,
+      show_grid: showGridValue,
+      grid_divisions: firstModel.grid_divisions ?? 200,
+      terrain_data: terrainStr,
+    })
+    
+    const row = db.prepare('SELECT * FROM models WHERE id = ?').get(newId)
+    
+    res.status(201).json({
+      type: 'model',
+      data: parseRow(row),
+    })
+  }
+})
+
 export default router

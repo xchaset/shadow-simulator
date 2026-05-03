@@ -14,10 +14,16 @@ export function getSunData(lat: number, lng: number, date: Date): SunData {
   }
 }
 
+/**
+ * 计算光源在 3D 空间中的位置
+ * @param azimuth 方位角（弧度）
+ * @param altitude 高度角（弧度）
+ * @param distance 光源到场景中心的距离
+ */
 export function sunToLightPosition(
   azimuth: number,
   altitude: number,
-  distance = 500,  // 增加距离，让阴影相机有更好的视角
+  distance = 500,
 ): [number, number, number] {
   // SunCalc azimuth: 0=South, clockwise (S→W→N→E)
   // Three.js (Y-up, right-handed): +Z=South, -Z=North, +X=East, -X=West
@@ -29,10 +35,13 @@ export function sunToLightPosition(
 }
 
 /**
- * 根据太阳高度角计算阴影相机的边界
+ * 根据太阳高度角和场景大小计算阴影相机的边界
  * 当太阳角度低时，阴影会延伸很远，需要更大的视锥体
  */
-export function calculateShadowCameraBounds(altitude: number): {
+export function calculateShadowCameraBounds(
+  altitude: number,
+  canvasSize: number = 2000,
+): {
   size: number
   far: number
 } {
@@ -46,12 +55,13 @@ export function calculateShadowCameraBounds(altitude: number): {
   // 计算最大阴影长度
   const maxShadowLength = maxBuildingHeight / Math.tan(minAltitude)
   
-  // 阴影相机边界需要覆盖：场景大小(500) + 阴影延伸长度
-  // 使用 1.2 倍的安全系数
-  const requiredSize = Math.max(300, (500 + maxShadowLength) * 0.6)
+  // 阴影相机边界需要覆盖：整个场景大小 + 阴影延伸长度
+  // 使用 1.2 倍的安全系数确保边缘区域也有阴影
+  const halfCanvasSize = canvasSize / 2
+  const requiredSize = Math.max(300, (halfCanvasSize + maxShadowLength) * 1.2)
   
-  // 限制最大边界，避免阴影贴图质量过低
-  const size = Math.min(requiredSize, 1500)
+  // 不再限制最大边界，确保覆盖整个场景
+  const size = requiredSize
   
   // far 平面需要足够远以覆盖整个场景深度
   const far = Math.max(1000, size * 2)

@@ -20,6 +20,10 @@ export function BuildingEditor({ editingId }: Props) {
     if (building) updateBuilding(building.id, { rotation: v })
   }, [building?.id, updateBuilding])
 
+  const handleBaseHeightChange = useCallback((v: number | null) => {
+    if (building && v !== null) updateBuilding(building.id, { baseHeight: v })
+  }, [building?.id, updateBuilding])
+
   const handleColorChange = useCallback((_: unknown, hex: string) => {
     if (building) updateBuilding(building.id, { color: hex })
   }, [building?.id, updateBuilding])
@@ -114,6 +118,30 @@ export function BuildingEditor({ editingId }: Props) {
           value={building.rotation}
           onChange={handleRotationChange}
         />
+      </div>
+
+      {/* Base Height */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>基础高度: {building.baseHeight ?? 0}</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Slider
+            min={-100}
+            max={200}
+            step={0.5}
+            value={building.baseHeight ?? 0}
+            onChange={handleBaseHeightChange}
+            style={{ flex: 1 }}
+          />
+          <InputNumber
+            size="small"
+            value={building.baseHeight ?? 0}
+            min={-1000}
+            max={1000}
+            step={0.5}
+            onChange={handleBaseHeightChange}
+            style={{ width: 70 }}
+          />
+        </div>
       </div>
 
       {/* Color (hide for GLB since it uses its own materials) */}

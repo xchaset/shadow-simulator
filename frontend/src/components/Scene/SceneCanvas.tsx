@@ -1,6 +1,8 @@
 import { useEffect, useCallback, useRef } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
+import * as THREE from 'three'
 import { Ground } from './Ground'
+import { WaterSurface } from './WaterSurface'
 import { SunLight } from './SunLight'
 import { SunIndicator } from './SunIndicator'
 import { CameraControls } from './CameraControls'
@@ -16,7 +18,11 @@ import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
 import { modelApi, recentModelApi } from '../../utils/api'
 import { loadState, saveState } from '../../utils/storage'
-import type { Building } from '../../types'
+import { DRAG_BUILDING_TYPE } from '../Toolbar/BuildingTools'
+import { DRAG_CUSTOM_TEMPLATE, createBuildingsFromDragData } from '../Toolbar/CustomTemplateBar'
+import { createBuilding } from '../../utils/buildings'
+import { getTerrainHeightAt } from '../../utils/terrain'
+import type { Building, BuildingType } from '../../types'
 
 /** 方向键每次移动的距离（米） */
 const MOVE_STEP = 1
@@ -40,6 +46,38 @@ interface ClipboardBuilding {
   glbScale?: number
 }
 
+type ScreenToWorldFn = (screenX: number, screenY: number) => [number, number] | null
+
+function DropInteraction({ onSetScreenToWorld }: { onSetScreenToWorld: (fn: ScreenToWorldFn) => void }) {
+  const { camera, gl } = useThree()
+  const tmpNdc = useRef(new THREE.Vector2())
+  const tmpRaycaster = useRef(new THREE.Raycaster())
+  const tmpHit = useRef(new THREE.Vector3())
+  const groundPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0))
+
+  const screenToWorld = useCallback(
+    (screenX: number, screenY: number): [number, number] | null => {
+      const rect = gl.domElement.getBoundingClientRect()
+      tmpNdc.current.set(
+        ((screenX - rect.left) / rect.width) * 2 - 1,
+        -((screenY - rect.top) / rect.height) * 2 + 1,
+      )
+      tmpRaycaster.current.setFromCamera(tmpNdc.current, camera)
+      if (tmpRaycaster.current.ray.intersectPlane(groundPlane.current, tmpHit.current)) {
+        return [tmpHit.current.x, tmpHit.current.z]
+      }
+      return null
+    },
+    [camera, gl],
+  )
+
+  useEffect(() => {
+    onSetScreenToWorld(screenToWorld)
+  }, [screenToWorld, onSetScreenToWorld])
+
+  return null
+}
+
 export function SceneCanvas() {
   const selectBuilding = useStore(s => s.selectBuilding)
   const clearSelection = useStore(s => s.clearSelection)
@@ -53,6 +91,51 @@ export function SceneCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const clipboardRef = useRef<ClipboardBuilding[] | null>(null)
   const terrainRef = useRef<any>(null)
+  const screenToWorldRef = useRef<ScreenToWorldFn | null>(null)
+
+  const setScreenToWorld = useCallback((fn: ScreenToWorldFn) => {
+    screenToWorldRef.current = fn
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(DRAG_BUILDING_TYPE) || 
+        e.dataTransfer.types.includes(DRAG_CUSTOM_TEMPLATE)) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    const buildingType = e.dataTransfer.getData(DRAG_BUILDING_TYPE) as BuildingType
+    const templateData = e.dataTransfer.getData(DRAG_CUSTOM_TEMPLATE)
+
+    if (!buildingType && !templateData) return
+
+    e.preventDefault()
+
+    const screenToWorld = screenToWorldRef.current
+    if (!screenToWorld) return
+
+    const worldPos = screenToWorld(e.clientX, e.clientY)
+    if (!worldPos) return
+
+    const state = useStore.getState()
+    const terrainHeight = getTerrainHeightAt(worldPos[0], worldPos[1], state.terrainData, state.canvasSize)
+
+    if (buildingType) {
+      const b = createBuilding(buildingType, worldPos)
+      b.baseHeight = terrainHeight
+      addBuilding(b)
+    } else if (templateData) {
+      try {
+        const dragData = JSON.parse(templateData)
+        const buildings = createBuildingsFromDragData(dragData, worldPos, terrainHeight)
+        buildings.forEach(b => addBuilding(b))
+      } catch (err) {
+        console.error('Failed to parse template data:', err)
+      }
+    }
+  }, [addBuilding])
 
   const handleTerrainHeightChange = useCallback(() => {
     useStore.getState().setDirty(true)
@@ -212,7 +295,13 @@ export function SceneCanvas() {
   const isReadOnly = shareMode.isReadOnly
 
   return (
-    <div ref={containerRef} style={{ flex: 1, position: 'relative' }} tabIndex={-1}>
+    <div 
+      ref={containerRef} 
+      style={{ flex: 1, position: 'relative' }} 
+      tabIndex={-1}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {!isReadOnly && <FloatingEditor />}
       {!isReadOnly && <CanvasSettings />}
 
@@ -226,6 +315,7 @@ export function SceneCanvas() {
           onClick={isReadOnly ? undefined : (terrainEditor.enabled || measurementTool.enabled ? undefined : () => clearSelection())}
           terrainRef={terrainRef}
         />
+        <WaterSurface />
         <BuildingGroup />
         {!isReadOnly && <SelectionBox start={boxSelectStart} end={boxSelectEnd} />}
         {!isReadOnly && <BoxSelectInteraction />}
@@ -235,6 +325,7 @@ export function SceneCanvas() {
         <SunIndicator />
         <CameraControls />
         {!isReadOnly && terrainEditor.enabled && <TerrainEditor geometryRef={terrainRef} onHeightChange={handleTerrainHeightChange} />}
+        {!isReadOnly && <DropInteraction onSetScreenToWorld={setScreenToWorld} />}
       </Canvas>
     </div>
   )

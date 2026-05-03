@@ -5,6 +5,7 @@ import { GlbImporter } from './GlbImporter'
 import { CitySelector } from './CitySelector'
 import { SunInfoPanel } from '../SunInfo/SunInfoPanel'
 import { TemplateSelector } from './TemplateSelector'
+import { CustomTemplateBar } from './CustomTemplateBar'
 import { ShareModal } from '../Share/ShareModal'
 import { Button } from 'antd'
 import { 
@@ -98,6 +99,9 @@ export function Toolbar({ onOpenMap, onOpenShadowAnalysis }: ToolbarProps) {
             </div>
             <div style={{ flexShrink: 0 }}>
               <TemplateSelector />
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              <CustomTemplateBar />
             </div>
             <div style={{ flexShrink: 0 }}>
               <BuildingImporter />

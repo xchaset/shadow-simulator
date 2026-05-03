@@ -1,4 +1,4 @@
-import type { TerrainData } from '../types'
+import type { TerrainData, LakeRegion } from '../types'
 
 const TERRAIN_RESOLUTION = 128
 
@@ -64,7 +64,7 @@ export function updateBuildingHeightsForTerrain(
 
   return buildings.map(b => {
     const newHeight = getTerrainHeightAt(b.position[0], b.position[1], terrainData, canvasSize)
-    if (Math.abs((b.height ?? 0) - newHeight) < 0.01) return b
-    return { ...b, height: newHeight }
+    if (Math.abs((b.baseHeight ?? 0) - newHeight) < 0.01) return b
+    return { ...b, baseHeight: newHeight }
   })
 }

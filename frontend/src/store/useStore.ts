@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode, ShadowAnalysisReport, MeasurementToolState, MeasurementMode, MeasurementPoint, MeasurementResult } from '../types'
+import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode, ShadowAnalysisReport, MeasurementToolState, MeasurementMode, MeasurementPoint, MeasurementResult, CustomTemplate, LakeState } from '../types'
 
 const MAX_UNDO = 20
 
@@ -199,6 +199,47 @@ export const useStore = create<AppState>((set, get) => ({
     })
   },
 
+  // Lake
+  lake: {
+    enabled: false,
+    waterLevel: -5,
+    waterColor: '#1a75ff',
+    waveHeight: 0.25,
+    opacity: 0.78,
+  } as LakeState,
+
+  setLake: (updates: Partial<LakeState>) =>
+    set(state => ({
+      lake: { ...state.lake, ...updates },
+      dirty: true,
+    })),
+
+  lakeRegions: [],
+
+  addLakeRegion: (region) =>
+    set(state => ({
+      lakeRegions: [...state.lakeRegions, region],
+      dirty: true,
+    })),
+
+  removeLakeRegion: (id) =>
+    set(state => ({
+      lakeRegions: state.lakeRegions.filter(r => r.id !== id),
+      dirty: true,
+    })),
+
+  clearLakeRegions: () =>
+    set({
+      lakeRegions: [],
+      dirty: true,
+    }),
+
+  setLakeRegions: (regions) =>
+    set({
+      lakeRegions: regions,
+      dirty: true,
+    }),
+
   // Shadow Analysis
   shadowAnalysisReport: null,
   setShadowAnalysisReport: (report: ShadowAnalysisReport | null) =>
@@ -316,4 +357,12 @@ export const useStore = create<AppState>((set, get) => ({
         ...updates,
       },
     })),
+
+  // Custom Templates
+  customTemplates: [],
+  setCustomTemplates: (templates: CustomTemplate[]) =>
+    set({ customTemplates: templates }),
+  customTemplateRefreshTrigger: 0,
+  triggerCustomTemplateRefresh: () =>
+    set(state => ({ customTemplateRefreshTrigger: state.customTemplateRefreshTrigger + 1 })),
 }))

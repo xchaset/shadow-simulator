@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
-import { Button, Slider, Radio, Space, Tooltip, Divider } from 'antd'
+import { useEffect, useState } from 'react'
+import { Button, Slider, Radio, Space, Tooltip, Divider, Switch, Collapse, ColorPicker } from 'antd'
+import type { CollapseProps } from 'antd'
 import {
   RiseOutlined,
   FallOutlined,
@@ -9,6 +10,7 @@ import {
   RedoOutlined,
   DeleteOutlined,
   EnvironmentOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../../store/useStore'
 import type { TerrainBrushMode } from '../../types'
@@ -23,6 +25,7 @@ const BRUSH_MODES: { mode: TerrainBrushMode; icon: React.ReactNode; label: strin
   { mode: 'lower', icon: <FallOutlined />, label: '降低 (W)' },
   { mode: 'smooth', icon: <ScanOutlined />, label: '平滑 (E)' },
   { mode: 'flatten', icon: <BorderOutlined />, label: '平整 (R)' },
+  { mode: 'water', icon: <ExperimentOutlined />, label: '水笔刷 (H)' },
 ]
 
 export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
@@ -30,6 +33,9 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
   const setTerrainEditor = useStore(s => s.setTerrainEditor)
   const terrainUndo = useStore(s => s.terrainUndo)
   const terrainRedo = useStore(s => s.terrainRedo)
+  const lake = useStore(s => s.lake)
+  const setLake = useStore(s => s.setLake)
+  const clearLakeRegions = useStore(s => s.clearLakeRegions)
 
   const handleModeChange = (mode: TerrainBrushMode) => {
     setTerrainEditor({ brushMode: mode })
@@ -146,6 +152,84 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
           value={terrainEditor.brushStrength}
           onChange={handleStrengthChange}
         />
+      </div>
+
+      <Divider style={{ margin: '12px 0' }} />
+
+      {/* 湖泊设置 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <ExperimentOutlined style={{ fontSize: 16, color: '#1677ff' }} />
+          <span style={{ fontWeight: 600, fontSize: 13 }}>湖泊设置</span>
+          <Switch
+            size="small"
+            checked={lake.enabled}
+            onChange={checked => setLake({ enabled: checked })}
+          />
+        </div>
+
+        {lake.enabled && (
+          <>
+            {/* 水位高度 */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
+                <span>水位高度</span>
+                <span>{lake.waterLevel}m</span>
+              </div>
+              <Slider
+                min={-50}
+                max={10}
+                value={lake.waterLevel}
+                onChange={value => setLake({ waterLevel: value })}
+                tooltip={{ formatter: v => `${v}m` }}
+              />
+            </div>
+
+            {/* 水颜色 */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>水颜色</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ColorPicker
+                  value={lake.waterColor}
+                  onChange={(color, hex) => setLake({ waterColor: hex })}
+                  showText
+                />
+                <span style={{ fontSize: 12, color: '#999' }}>调整水的颜色</span>
+              </div>
+            </div>
+
+            {/* 波浪高度 */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
+                <span>波浪高度</span>
+                <span>{lake.waveHeight.toFixed(2)}</span>
+              </div>
+              <Slider
+                min={0}
+                max={2}
+                step={0.05}
+                value={lake.waveHeight}
+                onChange={value => setLake({ waveHeight: value })}
+              />
+            </div>
+
+            {/* 透明度 */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
+                <span>透明度</span>
+                <span>{(lake.opacity * 100).toFixed(0)}%</span>
+              </div>
+              <Slider
+                min={0.1}
+                max={1}
+                step={0.05}
+                value={lake.opacity}
+                onChange={value => setLake({ opacity: value })}
+                tooltip={{ formatter: v => `${(v * 100).toFixed(0)}%` }}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <Divider style={{ margin: '12px 0' }} />

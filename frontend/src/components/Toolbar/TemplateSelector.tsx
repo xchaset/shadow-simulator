@@ -22,6 +22,7 @@ function createBuildingFromTemplate(
   position: [number, number]
   rotation: number
   color: string
+  baseHeight: number
 } {
   return {
     id: `building-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -34,6 +35,7 @@ function createBuildingFromTemplate(
     ],
     rotation: template.rotation,
     color: template.color,
+    baseHeight: 0,
   }
 }
 

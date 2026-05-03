@@ -6,6 +6,7 @@ import modelsRouter from './routes/models.js'
 import aiRouter from './routes/ai.js'
 import uploadsRouter from './routes/uploads.js'
 import sharesRouter from './routes/shares.js'
+import customTemplatesRouter from './routes/customTemplates.js'
 
 const app = express()
 const PORT = process.env.PORT || 3002
@@ -19,6 +20,7 @@ app.use('/api', modelsRouter)
 app.use('/api/ai', aiRouter)
 app.use('/api', uploadsRouter)
 app.use('/api', sharesRouter)
+app.use('/api', customTemplatesRouter)
 
 // Health check
 app.get('/api/health', (_req, res) => {

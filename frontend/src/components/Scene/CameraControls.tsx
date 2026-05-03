@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useMemo } from 'react'
 import { OrbitControls } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useStore } from '../../store/useStore'
@@ -22,6 +22,7 @@ export function CameraControls() {
   const isBoxSelecting = useStore(s => s.isBoxSelecting)
   const isTerrainDrawing = useStore(s => s.terrainEditor.isDrawing)
   const currentModelId = useStore(s => s.currentModelId)
+  const canvasSize = useStore(s => s.canvasSize)
 
   /** 上次保存的时间戳，用于节流 */
   const lastSaveRef = useRef(0)
@@ -79,7 +80,9 @@ export function CameraControls() {
     const camera = ctrl.object
     const distance = camera.position.distanceTo(ctrl.target)
     const newNear = Math.max(0.1, distance * 0.001)
-    const newFar = Math.max(3000, distance * 20)
+    // 确保 far 足够大，能够看到远距离的太阳和整个场景
+    // 使用 canvasSize * 2 作为最小值，确保覆盖整个场景和远距离的太阳
+    const newFar = Math.max(3000, distance * 20, canvasSize * 2)
 
     // 检查是否需要更新投影矩阵（避免不必要的 WebGL 操作）
     const last = lastClipStateRef.current
@@ -119,6 +122,11 @@ export function CameraControls() {
     }
   }, [persistCamera])
 
+  // 动态计算 OrbitControls 的 maxDistance，基于 canvasSize
+  const maxCameraDistance = useMemo(() => {
+    return Math.max(3000, canvasSize * 2)
+  }, [canvasSize])
+
   return (
     <OrbitControls
       ref={controlsRef}
@@ -127,7 +135,7 @@ export function CameraControls() {
       enableDamping
       dampingFactor={0.1}
       minDistance={5}
-      maxDistance={3000}
+      maxDistance={maxCameraDistance}
     />
   )
 }

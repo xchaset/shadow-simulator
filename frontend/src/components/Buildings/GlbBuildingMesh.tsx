@@ -100,7 +100,7 @@ export function GlbBuildingMesh({ building }: Props) {
   if (loadError || !scene) {
     return (
       <group
-        position={[building.position[0], 0, building.position[1]]}
+        position={[building.position[0], building.baseHeight ?? 0, building.position[1]]}
         rotation={[0, (building.rotation * Math.PI) / 180, 0]}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
@@ -121,7 +121,7 @@ export function GlbBuildingMesh({ building }: Props) {
   return (
     <group
       ref={groupRef}
-      position={[building.position[0], 0, building.position[1]]}
+      position={[building.position[0], building.baseHeight ?? 0, building.position[1]]}
       rotation={[0, (building.rotation * Math.PI) / 180, 0]}
       scale={[scale, scale, scale]}
       onClick={handleClick}

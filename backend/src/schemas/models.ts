@@ -7,6 +7,32 @@ export const listModels: ValidationSchema = {
   },
 }
 
+export const mergeModels: ValidationSchema = {
+  body: {
+    model_ids: {
+      type: 'array',
+      required: true,
+      min: 2,
+      max: 50,
+      items: commonRules.id,
+    },
+    name: commonRules.name,
+    description: commonRules.description,
+    target_directory_id: commonRules.id,
+    save_as_template: {
+      type: 'boolean',
+      required: false,
+      default: false,
+    },
+    template_category: {
+      type: 'string',
+      required: false,
+      max: 50,
+      default: '自定义模板',
+    },
+  },
+}
+
 export const createModel: ValidationSchema = {
   params: {
     dirId: commonRules.id,

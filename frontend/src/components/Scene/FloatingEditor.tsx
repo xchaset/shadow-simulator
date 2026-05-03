@@ -68,6 +68,10 @@ export function FloatingEditor() {
     if (building) updateBuilding(building.id, { rotation: v })
   }, [building, updateBuilding])
 
+  const handleBaseHeightChange = useCallback((v: number | null) => {
+    if (building && v !== null) updateBuilding(building.id, { baseHeight: v })
+  }, [building, updateBuilding])
+
   const handleColorChange = useCallback((_: unknown, hex: string) => {
     if (building) updateBuilding(building.id, { color: hex })
   }, [building, updateBuilding])
@@ -154,6 +158,30 @@ export function FloatingEditor() {
           max={360}
           value={building.rotation}
           onChange={handleRotationChange}
+          style={{ margin: '4px 0' }}
+        />
+      </div>
+
+      {/* Base Height */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+          <span style={{ fontSize: 11, color: '#888' }}>基础高度</span>
+          <InputNumber
+            size="small"
+            value={building.baseHeight ?? 0}
+            min={-1000}
+            max={1000}
+            step={0.5}
+            onChange={handleBaseHeightChange}
+            style={{ width: 70 }}
+          />
+        </div>
+        <Slider
+          min={-100}
+          max={200}
+          step={0.5}
+          value={building.baseHeight ?? 0}
+          onChange={handleBaseHeightChange}
           style={{ margin: '4px 0' }}
         />
       </div>
