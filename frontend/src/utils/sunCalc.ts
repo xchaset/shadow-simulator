@@ -41,27 +41,31 @@ export function sunToLightPosition(
 export function calculateShadowCameraBounds(
   altitude: number,
   canvasSize: number = 2000,
+  maxTerrainHeight: number = 0,
 ): {
   size: number
   far: number
 } {
-  // 假设场景中最高建筑为 100m
+  // 假设场景中最高建筑为 100m，加上地形的最大高度
   const maxBuildingHeight = 100
+  const maxHeight = maxBuildingHeight + maxTerrainHeight
   
   // 当太阳高度角很低时，阴影长度 = 建筑高度 / tan(高度角)
   // 限制最小角度为 5° 以避免无限大的阴影
   const minAltitude = Math.max(altitude, 5 * Math.PI / 180)
   
   // 计算最大阴影长度
-  const maxShadowLength = maxBuildingHeight / Math.tan(minAltitude)
+  const maxShadowLength = maxHeight / Math.tan(minAltitude)
   
   // 阴影相机边界需要覆盖：整个场景大小 + 阴影延伸长度
-  // 使用 1.2 倍的安全系数确保边缘区域也有阴影
+  // 减少安全系数从 1.2 到 1.1，以减少边界过大问题
   const halfCanvasSize = canvasSize / 2
-  const requiredSize = Math.max(300, (halfCanvasSize + maxShadowLength) * 1.2)
+  const requiredSize = Math.max(300, (halfCanvasSize + maxShadowLength) * 1.1)
   
-  // 不再限制最大边界，确保覆盖整个场景
-  const size = requiredSize
+  // 增加一个合理的最大边界限制，防止边界过大导致阴影质量下降
+  // 但需要考虑地形高度，所以适当增加最大限制
+  const maxAllowedSize = Math.max(canvasSize * 1.5, 2000 + maxTerrainHeight * 2)
+  const size = Math.min(requiredSize, maxAllowedSize)
   
   // far 平面需要足够远以覆盖整个场景深度
   const far = Math.max(1000, size * 2)

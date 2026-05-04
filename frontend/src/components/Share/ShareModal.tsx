@@ -165,7 +165,7 @@ export function ShareModal({ open, onClose }: ShareModalProps) {
       onCancel={onClose}
       width={600}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       {/* Tab bar */}
       <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0', marginBottom: 16 }}>

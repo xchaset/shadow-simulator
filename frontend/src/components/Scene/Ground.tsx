@@ -105,7 +105,7 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
     geometry.computeVertexNormals()
 
     updateWaterMaskAttribute(geometry, waterMask)
-  }, [terrainData, hasTerrain, terrainEditor.isDrawing, updateWaterMaskAttribute])
+  }, [terrainData, hasTerrain, terrainEditor.isDrawing, updateWaterMaskAttribute, canvasSize])
 
   useEffect(() => {
     const mesh = meshRef.current
@@ -125,6 +125,7 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
         ref={meshRef}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
+        castShadow
         position={[0, 0, 0]}
         onClick={onClick}
       >

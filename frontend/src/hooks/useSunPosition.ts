@@ -6,6 +6,7 @@ export function useSunPosition() {
   const location = useStore(s => s.location)
   const dateTime = useStore(s => s.dateTime)
   const canvasSize = useStore(s => s.canvasSize)
+  const terrainData = useStore(s => s.terrainData)
 
   const sunData = useMemo(
     () => getSunData(location.lat, location.lng, dateTime),
@@ -21,10 +22,11 @@ export function useSunPosition() {
     return sunToLightPosition(sunData.azimuth, sunData.altitude, distance)
   }, [sunData.azimuth, sunData.altitude, canvasSize])
 
-  const shadowBounds = useMemo(
-    () => calculateShadowCameraBounds(sunData.altitude, canvasSize),
-    [sunData.altitude, canvasSize],
-  )
+  const shadowBounds = useMemo(() => {
+    // 获取地形的最大高度，如果没有地形则为0
+    const maxTerrainHeight = terrainData ? terrainData.maxHeight : 0
+    return calculateShadowCameraBounds(sunData.altitude, canvasSize, maxTerrainHeight)
+  }, [sunData.altitude, canvasSize, terrainData])
 
   const ambientIntensity = useMemo(() => {
     if (sunData.isNight) return 0.1

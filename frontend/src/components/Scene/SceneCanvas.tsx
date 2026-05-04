@@ -308,6 +308,7 @@ export function SceneCanvas() {
       <Canvas
         shadows
         camera={{ position: [0, 100, -130], fov: 50, near: 0.1, far: 3000 }}
+        gl={{ antialias: true }}
       >
         <SkyBackground />
         <SunLight />

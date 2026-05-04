@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode, ShadowAnalysisReport, MeasurementToolState, MeasurementMode, MeasurementPoint, MeasurementResult, CustomTemplate, LakeState } from '../types'
+import { remapTerrainData } from '../utils/terrain'
 
 const MAX_UNDO = 20
 
@@ -92,7 +93,22 @@ export const useStore = create<AppState>((set, get) => ({
 
   // 画布设置（与模型绑定）
   canvasSize: 2000,
-  setCanvasSize: (size: number) => set({ canvasSize: size, dirty: true }),
+  setCanvasSize: (size: number) => {
+    const currentState = get()
+    const oldCanvasSize = currentState.canvasSize
+    
+    // 如果尺寸没有变化，直接返回
+    if (oldCanvasSize === size) return
+    
+    // 如果有地形数据，需要重新映射以保持在相同的世界位置
+    const terrainData = currentState.terrainData
+    if (terrainData) {
+      const remappedData = remapTerrainData(terrainData, oldCanvasSize, size)
+      set({ canvasSize: size, terrainData: remappedData, dirty: true })
+    } else {
+      set({ canvasSize: size, dirty: true })
+    }
+  },
   showGrid: true,
   setShowGrid: (v: boolean) => set({ showGrid: v, dirty: true }),
   gridDivisions: 200,
