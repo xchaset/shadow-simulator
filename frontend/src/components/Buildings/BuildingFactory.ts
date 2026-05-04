@@ -133,6 +133,14 @@ export function createBuildingGeometries(
     case 'glb':
       // GLB 模型由 GlbBuildingMesh 组件单独处理，这里返回占位几何体
       return [{ geometry: new THREE.BoxGeometry(10, 10, 10), position: [0, 5, 0] }]
+    case 'girder-bridge':
+      return createGirderBridgeGeometries(p)
+    case 'arch-bridge':
+      return createArchBridgeGeometries(p)
+    case 'suspension-bridge':
+      return createSuspensionBridgeGeometries(p)
+    case 'cable-stayed-bridge':
+      return createCableStayedBridgeGeometries(p)
     default:
       return [{ geometry: new THREE.BoxGeometry(10, 30, 10), position: [0, 15, 0] }]
   }
@@ -351,4 +359,604 @@ function createRiverGeometries(p: Record<string, number>): GeometryItem[] {
 
   // 略高于地面，避免 z-fighting
   return [{ geometry: geom, position: [0, 0.15, 0] }]
+}
+
+// ─── 梁式桥 ──────────────────────────────────────────────
+
+function createGirderBridgeGeometries(p: Record<string, number>): GeometryItem[] {
+  const items: GeometryItem[] = []
+  const length = p.length || 120
+  const width = p.width || 20
+  const deckThickness = p.deckThickness || 1.5
+  const deckHeight = p.deckHeight || 8
+  const pierCount = Math.max(2, p.pierCount || 3)
+  const pierWidth = p.pierWidth || 4
+  const pierDepth = p.pierDepth || 6
+  const girderHeight = p.girderHeight || 2
+
+  // 桥面
+  items.push({
+    geometry: new THREE.BoxGeometry(length, deckThickness, width),
+    position: [0, deckHeight + deckThickness / 2, 0],
+  })
+
+  // 主梁（左右两侧）
+  const girderY = deckHeight - girderHeight / 2
+  items.push({
+    geometry: new THREE.BoxGeometry(length, girderHeight, 1.5),
+    position: [0, girderY, width / 2 - 0.75],
+    color: '#696969',
+  })
+  items.push({
+    geometry: new THREE.BoxGeometry(length, girderHeight, 1.5),
+    position: [0, girderY, -width / 2 + 0.75],
+    color: '#696969',
+  })
+
+  // 桥墩
+  const pierSpacing = length / (pierCount - 1)
+  for (let i = 0; i < pierCount; i++) {
+    const x = -length / 2 + i * pierSpacing
+    // 主桥墩
+    items.push({
+      geometry: new THREE.BoxGeometry(pierWidth, deckHeight, pierDepth),
+      position: [x, deckHeight / 2, 0],
+      color: '#A0A0A0',
+    })
+    // 桥墩基础（略宽）
+    items.push({
+      geometry: new THREE.BoxGeometry(pierWidth + 2, 1.5, pierDepth + 2),
+      position: [x, 0.75, 0],
+      color: '#808080',
+    })
+  }
+
+  return items
+}
+
+// ─── 拱式桥 ──────────────────────────────────────────────
+
+function createArchBridgeGeometries(p: Record<string, number>): GeometryItem[] {
+  const items: GeometryItem[] = []
+  const length = p.length || 150
+  const width = p.width || 20
+  const deckThickness = p.deckThickness || 1.5
+  const deckHeight = p.deckHeight || 12
+  const archHeight = p.archHeight || 25
+  const pierWidth = p.pierWidth || 5
+  const pierDepth = p.pierDepth || 8
+  const spandrelCount = Math.max(2, p.spandrelCount || 6)
+
+  const halfLength = length / 2
+  const deckBottomY = deckHeight
+  const deckTopY = deckHeight + deckThickness
+
+  // 桥面
+  items.push({
+    geometry: new THREE.BoxGeometry(length, deckThickness, width),
+    position: [0, deckHeight + deckThickness / 2, 0],
+  })
+
+  // 主拱圈（使用多个圆柱段模拟抛物线拱）
+  const archSegments = 48
+  const archThickness = 1.8
+  const halfWidth = width / 2
+
+  // 真实上承式拱桥的拱参数：
+  // - 拱脚（两端）在桥台处，较低位置
+  // - 拱顶（跨中）在桥面下方
+  // - 立柱从拱圈向上连接到桥面底部
+  //
+  // 抛物线公式：y = archSpringingY + archRise * (1 - (x/halfLength)^2)
+  // - 在 x = ±halfLength 时（拱脚）：y = archSpringingY
+  // - 在 x = 0 时（拱顶）：y = archSpringingY + archRise
+  //
+  // 为了让拱在桥面下方，我们设置：
+  // - 拱脚高度：archSpringingY (较低位置)
+  // - 拱顶高度：archSpringingY + archRise (略低于桥面底部)
+
+  const archSpringingY = deckBottomY * 0.15  // 拱脚在较低位置
+  const archRise = deckBottomY * 0.7          // 拱的净矢高（从拱脚到拱顶的高度）
+  const archCrownY = archSpringingY + archRise  // 拱顶高度
+
+  // 验证拱顶在桥面下方
+  // 如果 archCrownY > deckBottomY，说明拱顶在桥面上方，需要调整
+  const adjustedArchRise = archCrownY > deckBottomY ? (deckBottomY - archSpringingY) * 0.9 : archRise
+  const finalArchCrownY = archSpringingY + adjustedArchRise
+
+  /**
+   * 计算主拱圈上某点的高度
+   * 公式：y = archSpringingY + adjustedArchRise * (1 - (x/halfLength)^2)
+   * - 拱脚（x = ±halfLength）：y = archSpringingY
+   * - 拱顶（x = 0）：y = archSpringingY + adjustedArchRise
+   */
+  function getArchY(x: number): number {
+    const normalizedX = x / halfLength
+    return archSpringingY + adjustedArchRise * (1 - normalizedX * normalizedX)
+  }
+
+  // 创建左拱肋和右拱肋
+  for (const sideOffset of [-halfWidth + archThickness, halfWidth - archThickness]) {
+    for (let i = 0; i < archSegments; i++) {
+      const t1 = i / archSegments
+      const t2 = (i + 1) / archSegments
+
+      const x1 = -halfLength + t1 * length
+      const x2 = -halfLength + t2 * length
+      const y1 = getArchY(x1)
+      const y2 = getArchY(x2)
+
+      const midX = (x1 + x2) / 2
+      const midY = (y1 + y2) / 2
+
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const segmentLength = Math.sqrt(dx * dx + dy * dy)
+
+      const archGeom = new THREE.CylinderGeometry(
+        archThickness / 2, archThickness / 2, segmentLength, 10
+      )
+
+      const angle = Math.atan2(dy, dx)
+      archGeom.rotateZ(Math.PI / 2 - angle)
+
+      items.push({
+        geometry: archGeom,
+        position: [midX, midY, sideOffset],
+        color: '#8B4513',
+      })
+    }
+  }
+
+  // 拱肋之间的横系梁（连接左右拱肋）
+  const crossBeamCount = Math.floor(archSegments / 6)
+  for (let i = 0; i <= crossBeamCount; i++) {
+    const t = i / crossBeamCount
+    const x = -halfLength + t * length
+    const y = getArchY(x)
+
+    items.push({
+      geometry: new THREE.BoxGeometry(archThickness * 1.2, archThickness * 1.2, width - archThickness * 2),
+      position: [x, y, 0],
+      color: '#A0522D',
+    })
+  }
+
+  // 拱上立柱（从拱圈向上连接到桥面底部）
+  const spandrelSpacing = length / (spandrelCount + 1)
+  for (let i = 1; i <= spandrelCount; i++) {
+    const x = -halfLength + i * spandrelSpacing
+    const archY = getArchY(x)
+    const columnHeight = deckBottomY - archY
+
+    if (columnHeight > 1.0) {
+      // 前后两根立柱
+      for (const zOffset of [-halfWidth + archThickness + 1.5, halfWidth - archThickness - 1.5]) {
+        items.push({
+          geometry: new THREE.BoxGeometry(1.2, columnHeight, 1.2),
+          position: [x, archY + columnHeight / 2, zOffset],
+          color: '#A0522D',
+        })
+      }
+      // 立柱顶部的盖梁（连接立柱和支撑桥面）
+      items.push({
+        geometry: new THREE.BoxGeometry(2.5, 1.0, width - archThickness * 2 - 3),
+        position: [x, deckBottomY - 0.5, 0],
+        color: '#8B4513',
+      })
+    }
+  }
+
+  // 两端桥台（更坚固的支撑结构）
+  const abutmentX = [-halfLength, halfLength]
+  for (const x of abutmentX) {
+    // 桥台基础
+    items.push({
+      geometry: new THREE.BoxGeometry(pierWidth + 10, 4, pierDepth + 10),
+      position: [x, 2, 0],
+      color: '#4A4A4A',
+    })
+    // 桥台主体
+    items.push({
+      geometry: new THREE.BoxGeometry(pierWidth + 6, deckBottomY * 0.8, pierDepth + 6),
+      position: [x, deckBottomY * 0.4, 0],
+      color: '#654321',
+    })
+    // 桥台顶部（连接拱脚和桥面）
+    items.push({
+      geometry: new THREE.BoxGeometry(pierWidth + 4, deckBottomY * 0.25, pierDepth + 4),
+      position: [x, deckBottomY * 0.875, 0],
+      color: '#8B4513',
+    })
+    // 拱脚加强块
+    items.push({
+      geometry: new THREE.BoxGeometry(pierWidth, 3, pierDepth + 2),
+      position: [x, archSpringingY + 1.5, 0],
+      color: '#5A4A3A',
+    })
+  }
+
+  return items
+}
+
+// ─── 悬索桥 ──────────────────────────────────────────────
+
+function createSuspensionBridgeGeometries(p: Record<string, number>): GeometryItem[] {
+  const items: GeometryItem[] = []
+  const mainSpan = p.mainSpan || 200
+  const sideSpan = p.sideSpan || 80
+  const width = p.width || 25
+  const deckThickness = p.deckThickness || 2
+  const deckHeight = p.deckHeight || 15
+  const towerHeight = p.towerHeight || 60
+  const towerWidth = p.towerWidth || 8
+  const towerDepth = p.towerDepth || 12
+  const mainCableHeight = p.mainCableHeight || 40
+  const hangerCount = Math.max(10, p.hangerCount || 20)
+
+  const totalLength = mainSpan + 2 * sideSpan
+  const halfMain = mainSpan / 2
+  const towerTopY = towerHeight - 1
+  const anchorTopY = 20  // 锚碇顶部散索鞍高度
+
+  // 左桥塔位置
+  const leftTowerX = -halfMain
+  // 右桥塔位置
+  const rightTowerX = halfMain
+  // 左锚碇位置
+  const leftAnchorX = -halfMain - sideSpan - 15
+  // 右锚碇位置
+  const rightAnchorX = halfMain + sideSpan + 15
+  // 桥塔到锚碇的距离
+  const sideSpanDist = sideSpan + 15
+
+  // 桥面
+  items.push({
+    geometry: new THREE.BoxGeometry(totalLength, deckThickness, width),
+    position: [0, deckHeight + deckThickness / 2, 0],
+  })
+
+  // 桥塔（两座，位于主跨两端）
+  const towerX = [leftTowerX, rightTowerX]
+  for (const x of towerX) {
+    // 主塔柱（分成左右两根，形成门式结构）
+    const towerHalfWidth = towerWidth / 2 - 1.5
+    for (const sideOffset of [-towerHalfWidth, towerHalfWidth]) {
+      items.push({
+        geometry: new THREE.BoxGeometry(2.5, towerHeight, towerDepth * 0.4),
+        position: [x + sideOffset, towerHeight / 2, 0],
+        color: '#4682B4',
+      })
+    }
+    // 塔顶横梁
+    items.push({
+      geometry: new THREE.BoxGeometry(towerWidth + 2, 2.5, towerDepth * 0.6),
+      position: [x, towerHeight - 1.25, 0],
+      color: '#5F9EA0',
+    })
+    // 鞍座（位于塔顶，支撑主缆）
+    items.push({
+      geometry: new THREE.BoxGeometry(towerWidth + 4, 1.5, towerDepth * 0.8),
+      position: [x, towerHeight - 0.75, 0],
+      color: '#2F4F4F',
+    })
+    // 鞍座顶部的弧形支撑
+    const saddleCurve = new THREE.CylinderGeometry(
+      1.5, 1.5, width * 0.8, 16, 1, false, Math.PI, Math.PI
+    )
+    saddleCurve.rotateX(Math.PI / 2)
+    items.push({
+      geometry: saddleCurve,
+      position: [x, towerHeight + 0.5, 0],
+      color: '#4A4A4A',
+    })
+    // 塔基
+    items.push({
+      geometry: new THREE.BoxGeometry(towerWidth + 8, 4, towerDepth + 6),
+      position: [x, 2, 0],
+      color: '#2F4F4F',
+    })
+  }
+
+  // 主缆参数
+  const cableSegments = 100
+  const cableRadius = 0.4
+  const halfCableWidth = width / 2 - 1.5
+
+  // 主跨主缆垂度（从塔顶到最低点的距离）
+  const mainSag = mainCableHeight * 0.85
+
+  /**
+   * 计算主跨主缆上某点的高度
+   * 真实悬索桥主跨主缆形状：倒置抛物线（悬链线近似）
+   * 公式：y = towerTopY - mainSag * (1 - (x/halfMain)^2)
+   * - 在 x = -halfMain（左塔）和 x = halfMain（右塔）时，y = towerTopY（最高点）
+   * - 在 x = 0（跨中）时，y = towerTopY - mainSag（最低点）
+   */
+  function getMainSpanCableY(x: number): number {
+    const normalizedX = x / halfMain
+    return towerTopY - mainSag * (1 - normalizedX * normalizedX)
+  }
+
+  /**
+   * 计算边跨主缆上某点的高度
+   * 真实悬索桥边跨主缆：从桥塔顶部连接到锚碇顶部散索鞍
+   * 形状：近似直线，带有微小抛物线垂度使缆线更自然
+   * - 在桥塔处（dist=0），y = towerTopY（最高点）
+   * - 在锚碇处（dist=totalSpan），y = anchorTopY（锚碇顶部）
+   */
+  function getSideSpanCableY(x: number, towerX: number, anchorX: number): number {
+    const totalSpan = Math.abs(towerX - anchorX)
+    const distFromTower = Math.abs(x - towerX)
+    const t = Math.min(distFromTower / totalSpan, 1)
+    // 线性插值 + 微小抛物线垂度
+    const linearY = towerTopY * (1 - t) + anchorTopY * t
+    const sagAmount = 2 // 边跨主缆微小垂度
+    return linearY - sagAmount * t * (1 - t)
+  }
+
+  // 创建主缆的辅助函数
+  function createCableSegment(
+    x1: number, y1: number,
+    x2: number, y2: number,
+    zOffset: number
+  ): void {
+    const midX = (x1 + x2) / 2
+    const midY = (y1 + y2) / 2
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const length = Math.sqrt(dx * dx + dy * dy)
+
+    const cableGeom = new THREE.CylinderGeometry(cableRadius, cableRadius, length, 12)
+    const angle = Math.atan2(dy, dx)
+    cableGeom.rotateZ(Math.PI / 2 - angle)
+
+    items.push({
+      geometry: cableGeom,
+      position: [midX, midY, zOffset],
+      color: '#5A4A3A',
+    })
+  }
+
+  // 创建吊杆的辅助函数
+  function createHanger(
+    x: number, cableY: number,
+    deckY: number, zOffset: number
+  ): void {
+    if (cableY > deckY + 0.5) {
+      const hangerLength = cableY - deckY
+      items.push({
+        geometry: new THREE.CylinderGeometry(0.12, 0.12, hangerLength, 6),
+        position: [x, (cableY + deckY) / 2, zOffset],
+        color: '#C0C0C0',
+      })
+    }
+  }
+
+  for (const side of [-1, 1]) {
+    const zOffset = side * halfCableWidth
+
+    // ─── 左边跨主缆：从左锚碇到左塔 ─────────────────────────────────
+    // 真实结构：主缆从锚碇顶部散索鞍延伸到左塔顶部
+    // 形状：近似直线，主缆锚固在锚碇中
+    const leftSideSegments = Math.floor(cableSegments * sideSpanDist / (mainSpan + 2 * sideSpanDist))
+    for (let i = 0; i < leftSideSegments; i++) {
+      const t1 = i / leftSideSegments
+      const t2 = (i + 1) / leftSideSegments
+
+      const x1 = leftAnchorX + t1 * sideSpanDist
+      const x2 = leftAnchorX + t2 * sideSpanDist
+
+      const y1 = getSideSpanCableY(x1, leftTowerX, leftAnchorX)
+      const y2 = getSideSpanCableY(x2, leftTowerX, leftAnchorX)
+
+      createCableSegment(x1, y1, x2, y2, zOffset)
+    }
+
+    // ─── 主跨主缆：从左塔到右塔 ─────────────────────────────────
+    // 真实结构：主缆从左塔顶部向下弯曲到跨中最低点，再向上到右塔顶部
+    // 形状：倒置抛物线（悬链线近似）
+    for (let i = 0; i < cableSegments; i++) {
+      const t1 = i / cableSegments
+      const t2 = (i + 1) / cableSegments
+
+      const x1 = leftTowerX + t1 * mainSpan
+      const x2 = leftTowerX + t2 * mainSpan
+      const y1 = getMainSpanCableY(x1)
+      const y2 = getMainSpanCableY(x2)
+
+      createCableSegment(x1, y1, x2, y2, zOffset)
+    }
+
+    // ─── 右边跨主缆：从右塔到右锚碇 ─────────────────────────────────
+    // 真实结构：主缆从右塔顶部向锚碇延伸，锚固在锚碇散索鞍中
+    // 形状：近似直线
+    const rightSideSegments = Math.floor(cableSegments * sideSpanDist / (mainSpan + 2 * sideSpanDist))
+    for (let i = 0; i < rightSideSegments; i++) {
+      const t1 = i / rightSideSegments
+      const t2 = (i + 1) / rightSideSegments
+
+      const x1 = rightTowerX + t1 * sideSpanDist
+      const x2 = rightTowerX + t2 * sideSpanDist
+
+      const y1 = getSideSpanCableY(x1, rightTowerX, rightAnchorX)
+      const y2 = getSideSpanCableY(x2, rightTowerX, rightAnchorX)
+
+      createCableSegment(x1, y1, x2, y2, zOffset)
+    }
+
+    // ─── 吊杆：从主缆垂直连接到桥面 ─────────────────────────────────
+    const deckTopY = deckHeight + deckThickness
+
+    // 主跨吊杆
+    for (let i = 0; i <= hangerCount; i++) {
+      const t = i / hangerCount
+      const x = leftTowerX + t * mainSpan
+      const cableY = getMainSpanCableY(x)
+      createHanger(x, cableY, deckTopY, zOffset)
+    }
+
+    // 左边跨吊杆（较少）
+    const sideHangerCount = Math.floor(hangerCount * 0.3)
+    for (let i = 1; i <= sideHangerCount; i++) {
+      const t = i / (sideHangerCount + 1)
+      const x = leftTowerX - t * sideSpan
+      const cableY = getSideSpanCableY(x, leftTowerX, leftAnchorX)
+      createHanger(x, cableY, deckTopY, zOffset)
+    }
+
+    // 右边跨吊杆（较少）
+    for (let i = 1; i <= sideHangerCount; i++) {
+      const t = i / (sideHangerCount + 1)
+      const x = rightTowerX + t * sideSpan
+      const cableY = getSideSpanCableY(x, rightTowerX, rightAnchorX)
+      createHanger(x, cableY, deckTopY, zOffset)
+    }
+  }
+
+  // ─── 锚碇结构：主缆两端的锚固点 ─────────────────────────────────
+  // 真实结构：重力式锚碇，依靠自重抵抗主缆拉力
+  const anchorPositions = [leftAnchorX, rightAnchorX]
+  for (const x of anchorPositions) {
+    // 锚碇基础
+    items.push({
+      geometry: new THREE.BoxGeometry(25, 6, width + 10),
+      position: [x, 3, 0],
+      color: '#3A3A3A',
+    })
+    // 锚碇主体
+    items.push({
+      geometry: new THREE.BoxGeometry(18, 12, width + 6),
+      position: [x, 9, 0],
+      color: '#4A4A4A',
+    })
+    // 锚碇顶部（散索鞍位置）
+    items.push({
+      geometry: new THREE.BoxGeometry(12, 4, width + 2),
+      position: [x, 17, 0],
+      color: '#5A5A5A',
+    })
+    // 散索鞍示意
+    items.push({
+      geometry: new THREE.BoxGeometry(8, 2, width),
+      position: [x, 20, 0],
+      color: '#6A6A6A',
+    })
+  }
+
+  return items
+}
+
+// ─── 斜拉桥 ──────────────────────────────────────────────
+
+function createCableStayedBridgeGeometries(p: Record<string, number>): GeometryItem[] {
+  const items: GeometryItem[] = []
+  const mainSpan = p.mainSpan || 180
+  const sideSpan = p.sideSpan || 70
+  const width = p.width || 25
+  const deckThickness = p.deckThickness || 2
+  const deckHeight = p.deckHeight || 15
+  const towerHeight = p.towerHeight || 50
+  const towerWidth = p.towerWidth || 6
+  const towerDepth = p.towerDepth || 10
+  const cableCount = Math.max(6, p.cableCount || 12)
+  const cableFanAngle = p.cableFanAngle || 30
+
+  const totalLength = mainSpan + 2 * sideSpan
+  const halfMain = mainSpan / 2
+
+  // 桥面
+  items.push({
+    geometry: new THREE.BoxGeometry(totalLength, deckThickness, width),
+    position: [0, deckHeight + deckThickness / 2, 0],
+  })
+
+  // 桥塔（两座）
+  const towerX = [-halfMain, halfMain]
+  for (const x of towerX) {
+    // 主塔柱（A字形简化为矩形）
+    items.push({
+      geometry: new THREE.BoxGeometry(towerWidth, towerHeight, towerDepth),
+      position: [x, towerHeight / 2, 0],
+      color: '#5F9EA0',
+    })
+    // 塔基
+    items.push({
+      geometry: new THREE.BoxGeometry(towerWidth + 5, 3, towerDepth + 5),
+      position: [x, 1.5, 0],
+      color: '#2F4F4F',
+    })
+  }
+
+  // 斜拉索（扇形布置）
+  const halfCableWidth = width / 2 - 0.5
+  const towerTopY = towerHeight - 2
+
+  // 左桥塔的拉索
+  for (let towerIdx = 0; towerIdx < 2; towerIdx++) {
+    const towerXPos = towerX[towerIdx]
+    const direction = towerIdx === 0 ? 1 : -1
+
+    // 主跨方向拉索
+    for (let i = 1; i <= cableCount; i++) {
+      const ratio = i / cableCount
+      const cableX = towerXPos + direction * ratio * halfMain
+      const cableY = deckHeight + deckThickness
+
+      // 塔上的连接点（从下到上分布）
+      const towerCableY = deckHeight + 2 + ratio * (towerTopY - deckHeight - 2)
+
+      // 前后两面的拉索
+      for (const side of [-1, 1]) {
+        const zOffset = side * halfCableWidth
+
+        const start = new THREE.Vector3(towerXPos, towerCableY, zOffset)
+        const end = new THREE.Vector3(cableX, cableY, zOffset)
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5)
+        const dir = new THREE.Vector3().subVectors(end, start)
+        const length = dir.length()
+
+        const cableGeom = new THREE.CylinderGeometry(0.12, 0.12, length, 6)
+        cableGeom.rotateX(Math.PI / 2)
+        cableGeom.lookAt(dir)
+
+        items.push({
+          geometry: cableGeom,
+          position: [mid.x, mid.y, mid.z],
+          color: '#FFFFFF',
+        })
+      }
+    }
+
+    // 边跨方向拉索（较少）
+    const sideCableCount = Math.floor(cableCount * 0.6)
+    for (let i = 1; i <= sideCableCount; i++) {
+      const ratio = i / sideCableCount
+      const cableX = towerXPos - direction * ratio * sideSpan
+      const cableY = deckHeight + deckThickness
+      const towerCableY = deckHeight + 2 + ratio * (towerTopY - deckHeight - 2) * 0.7
+
+      for (const side of [-1, 1]) {
+        const zOffset = side * halfCableWidth
+
+        const start = new THREE.Vector3(towerXPos, towerCableY, zOffset)
+        const end = new THREE.Vector3(cableX, cableY, zOffset)
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5)
+        const dir = new THREE.Vector3().subVectors(end, start)
+        const length = dir.length()
+
+        const cableGeom = new THREE.CylinderGeometry(0.12, 0.12, length, 6)
+        cableGeom.rotateX(Math.PI / 2)
+        cableGeom.lookAt(dir)
+
+        items.push({
+          geometry: cableGeom,
+          position: [mid.x, mid.y, mid.z],
+          color: '#FFFFFF',
+        })
+      }
+    }
+  }
+
+  return items
 }

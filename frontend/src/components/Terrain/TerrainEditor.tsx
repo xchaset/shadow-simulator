@@ -51,11 +51,26 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       useStore.getState().setTerrainData({
         resolution: 128,
         heights: new Float32Array(128 * 128),
-        maxHeight: 50,
+        maxHeight: 500,
         waterMask: new Uint8Array(128 * 128),
       })
     }
   }, [])
+
+  useEffect(() => {
+    const canvas = gl.domElement
+    const originalCursor = canvas.style.cursor
+
+    if (terrainEditor.enabled) {
+      canvas.style.cursor = 'none'
+    } else {
+      canvas.style.cursor = originalCursor || ''
+    }
+
+    return () => {
+      canvas.style.cursor = originalCursor || ''
+    }
+  }, [terrainEditor.enabled, gl.domElement])
 
   const worldToIndex = useCallback((wx: number, wz: number): [number, number] => {
     const halfSize = canvasSize / 2
@@ -132,7 +147,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       const newData = {
         resolution: 128,
         heights: new Float32Array(128 * 128),
-        maxHeight: 50,
+        maxHeight: 500,
         waterMask: new Uint8Array(128 * 128),
       }
       console.log('[TerrainEditor] 初始化地形数据:', newData)
@@ -144,7 +159,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       data.waterMask = new Uint8Array(data.resolution * data.resolution)
     }
 
-    const { brushMode, brushRadius, brushStrength } = useStore.getState().terrainEditor
+    const { brushMode, brushRadius, brushStrength, brushMaxHeight } = useStore.getState().terrainEditor
     const [cx, cy] = worldToIndex(worldX, worldZ)
     const radiusInIndices = Math.ceil((brushRadius / canvasSize) * 128)
     const isWaterBrush = brushMode === 'water'
@@ -183,10 +198,10 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
           switch (brushMode) {
             case 'raise':
-              heights[idx] = Math.min(data.maxHeight, currentHeight + brushStrength * falloff)
+              heights[idx] = Math.min(brushMaxHeight, currentHeight + brushStrength * falloff)
               break
             case 'lower':
-              heights[idx] = Math.max(-data.maxHeight, currentHeight - brushStrength * falloff)
+              heights[idx] = Math.max(-brushMaxHeight, currentHeight - brushStrength * falloff)
               break
             case 'smooth': {
               let sum = 0
@@ -237,17 +252,18 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     const data = useStore.getState().terrainData
     console.log('[TerrainEditor] 从 store 获取 terrainData:', data ? '存在' : 'null')
     if (data) {
+      const { brushMaxHeight } = useStore.getState().terrainEditor
       console.log('[TerrainEditor] terrainData 详情:', {
         resolution: data.resolution,
         heightsLength: data.heights?.length,
-        maxHeight: data.maxHeight,
+        brushMaxHeight,
         hasWaterMask: !!data.waterMask,
       })
 
       useStore.getState().setTerrainData({
         resolution: data.resolution,
         heights: data.heights,
-        maxHeight: data.maxHeight,
+        maxHeight: brushMaxHeight,
         waterMask: data.waterMask,
       })
 
@@ -298,6 +314,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
       const pos = getWorldPosition(e)
       if (!pos) return
+      setTerrainEditor({ brushPosition: pos })
 
       if (lastPosRef.current) {
         const [lx, lz] = lastPosRef.current
@@ -358,7 +375,6 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
     const canvas = gl.domElement
     const onMove = (e: PointerEvent) => {
-      if (isDrawingRef.current) return
       const pos = getWorldPosition(e)
       setTerrainEditor({ brushPosition: pos })
     }
@@ -369,7 +385,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
   useFrame(() => {
     const { brushPosition, brushRadius, enabled } = useStore.getState().terrainEditor
 
-    if (!enabled || !brushPosition || isDrawingRef.current) {
+    if (!enabled || !brushPosition) {
       if (lastStyleRef.current.display !== 'none') {
         if (!brushIndicatorRef.current) {
           brushIndicatorRef.current = document.getElementById('terrain-brush-indicator')

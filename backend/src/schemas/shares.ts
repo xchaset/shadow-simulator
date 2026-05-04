@@ -48,6 +48,10 @@ export const createShare: ValidationSchema = {
       type: 'object',
       required: false,
     },
+    lake_data: {
+      type: 'object',
+      required: false,
+    },
     expires_in_hours: {
       type: 'number',
       required: false,

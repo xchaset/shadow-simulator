@@ -195,9 +195,6 @@ export function WaterSurface() {
         transparent
         side={THREE.DoubleSide}
         depthWrite={false}
-        polygonOffset
-        polygonOffsetFactor={-1}
-        polygonOffsetUnits={-1}
       />
     </mesh>
   )

@@ -222,6 +222,59 @@ const ICON_MAP: Record<string, ReactNode> = {
       <line x1="12" y1="16" x2="12" y2="22" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
     </svg>
   ),
+  'girder-bridge': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="1" y="10" width="22" height="2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1.5" />
+      <line x1="1" y1="12" x2="23" y2="12" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="3" y="12" width="2" height="10" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+      <rect x="11" y="12" width="2" height="10" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+      <rect x="19" y="12" width="2" height="10" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+    </svg>
+  ),
+  'arch-bridge': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="1" y="8" width="22" height="1.5" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1.5" />
+      <path d="M3,9.5 Q12,1 21,9.5" stroke="currentColor" fill="none" strokeWidth="2" />
+      <path d="M3,9.5 Q12,1 21,9.5" stroke="currentColor" fill="none" strokeWidth="1" strokeDasharray="0,0" transform="translate(0,2.5)" />
+      <line x1="6" y1="9.5" x2="6" y2="15" stroke="currentColor" strokeWidth="1" />
+      <line x1="10" y1="9.5" x2="10" y2="12" stroke="currentColor" strokeWidth="1" />
+      <line x1="14" y1="9.5" x2="14" y2="12" stroke="currentColor" strokeWidth="1" />
+      <line x1="18" y1="9.5" x2="18" y2="15" stroke="currentColor" strokeWidth="1" />
+      <rect x="1" y="9.5" width="3" height="13" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+      <rect x="20" y="9.5" width="3" height="13" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+    </svg>
+  ),
+  'suspension-bridge': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="0" y="14" width="24" height="1.5" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1.5" />
+      <rect x="5" y="4" width="2" height="11.5" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.2" />
+      <rect x="17" y="4" width="2" height="11.5" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.2" />
+      <rect x="4" y="2" width="4" height="2" stroke="currentColor" fill="currentColor" fillOpacity="0.7" strokeWidth="1" />
+      <rect x="16" y="2" width="4" height="2" stroke="currentColor" fill="currentColor" fillOpacity="0.7" strokeWidth="1" />
+      <path d="M1,14 Q6,4 12,12 Q18,4 23,14" stroke="currentColor" fill="none" strokeWidth="2" />
+      <line x1="7" y1="7" x2="7" y2="14" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.7" />
+      <line x1="9" y1="10" x2="9" y2="14" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.7" />
+      <line x1="11" y1="12" x2="11" y2="14" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.7" />
+      <line x1="13" y1="12" x2="13" y2="14" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.7" />
+      <line x1="15" y1="10" x2="15" y2="14" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.7" />
+      <line x1="17" y1="7" x2="17" y2="14" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.7" />
+    </svg>
+  ),
+  'cable-stayed-bridge': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="1" y="15" width="22" height="1.5" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1.5" />
+      <rect x="11" y="3" width="2" height="13.5" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.2" />
+      <rect x="10" y="1" width="4" height="2" stroke="currentColor" fill="currentColor" fillOpacity="0.7" strokeWidth="1" />
+      <line x1="12" y1="5" x2="5" y2="15" stroke="currentColor" strokeWidth="1" />
+      <line x1="12" y1="7" x2="7" y2="15" stroke="currentColor" strokeWidth="1" />
+      <line x1="12" y1="9" x2="9" y2="15" stroke="currentColor" strokeWidth="1" />
+      <line x1="12" y1="5" x2="19" y2="15" stroke="currentColor" strokeWidth="1" />
+      <line x1="12" y1="7" x2="17" y2="15" stroke="currentColor" strokeWidth="1" />
+      <line x1="12" y1="9" x2="15" y2="15" stroke="currentColor" strokeWidth="1" />
+      <rect x="0" y="16.5" width="2" height="6" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+      <rect x="22" y="16.5" width="2" height="6" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+    </svg>
+  ),
 }
 
 export function BuildingIcon({ name }: { name: string }) {

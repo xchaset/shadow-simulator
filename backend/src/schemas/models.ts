@@ -66,6 +66,10 @@ export const createModel: ValidationSchema = {
       type: 'object',
       required: false,
     },
+    lake_data: {
+      type: 'object',
+      required: false,
+    },
   },
 }
 
@@ -139,6 +143,10 @@ export const updateModel: ValidationSchema = {
       max: 500,
     },
     terrain_data: {
+      type: 'object',
+      required: false,
+    },
+    lake_data: {
       type: 'object',
       required: false,
     },

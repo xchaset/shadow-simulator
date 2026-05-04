@@ -270,12 +270,20 @@ export function SceneCanvas() {
       if (model.grid_divisions !== undefined) state.setGridDivisions(model.grid_divisions)
 
       if (model.terrain_data) {
-        state.setTerrainData({
+        const terrainData = {
           ...model.terrain_data,
           heights: new Float32Array(model.terrain_data.heights),
-        })
+        }
+        if (model.terrain_data.waterMask) {
+          terrainData.waterMask = new Uint8Array(model.terrain_data.waterMask)
+        }
+        state.setTerrainData(terrainData)
       } else {
         state.setTerrainData(null)
+      }
+
+      if (model.lake_data) {
+        state.setLake(model.lake_data)
       }
 
       state.setCurrentModelId(model.id)
@@ -302,6 +310,18 @@ export function SceneCanvas() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      <div
+        id="terrain-brush-indicator"
+        style={{
+          position: 'fixed',
+          pointerEvents: 'none',
+          zIndex: 1000,
+          border: '2px solid rgba(255, 255, 255, 0.8)',
+          borderRadius: '50%',
+          boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(0, 0, 0, 0.1)',
+          display: 'none',
+        }}
+      />
       {!isReadOnly && <FloatingEditor />}
       {!isReadOnly && <CanvasSettings />}
 

@@ -144,6 +144,7 @@ export const useStore = create<AppState>((set, get) => ({
     brushMode: 'raise',
     brushRadius: 50,
     brushStrength: 5,
+    brushMaxHeight: 500,
     brushPosition: null,
     isDrawing: false,
     undoStack: [],

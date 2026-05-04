@@ -23,6 +23,12 @@ function parseShareRow(row: any) {
       row.terrain_data = parsed
     } catch { row.terrain_data = null }
   }
+  if (typeof row.lake_data === 'string') {
+    try {
+      const parsed = JSON.parse(row.lake_data)
+      row.lake_data = parsed
+    } catch { row.lake_data = null }
+  }
   if (row.show_grid !== undefined && row.show_grid !== null) {
     row.show_grid = !!row.show_grid
   }
@@ -38,10 +44,25 @@ function serializeTerrainData(terrain_data: any): string | null {
     return null
   }
   
-  return JSON.stringify({
-    ...terrain_data,
+  const toSerialize = {
+    resolution: terrain_data.resolution,
     heights: Array.from(terrain_data.heights),
-  })
+    maxHeight: terrain_data.maxHeight,
+  }
+  
+  if (terrain_data.waterMask) {
+    toSerialize.waterMask = Array.from(terrain_data.waterMask)
+  }
+  
+  return JSON.stringify(toSerialize)
+}
+
+/** Serialize lake data for storage */
+function serializeLakeData(lake_data: any): string | null {
+  if (!lake_data) {
+    return null
+  }
+  return JSON.stringify(lake_data)
 }
 
 /** Normalize scene data */
@@ -63,7 +84,7 @@ router.post('/shares', validate(schema.createShare), (req, res) => {
   const {
     model_id, name, description, location_lat, location_lng,
     city_name, date_time, scene_data, canvas_size, show_grid,
-    grid_divisions, terrain_data, expires_in_hours,
+    grid_divisions, terrain_data, lake_data, expires_in_hours,
   } = req.body
 
   const { str: sceneStr, count: buildingCount } = normalizeSceneData(scene_data)
@@ -72,6 +93,7 @@ router.post('/shares', validate(schema.createShare), (req, res) => {
   const dt = date_time || new Date().toISOString()
 
   const terrainStr = serializeTerrainData(terrain_data)
+  const lakeStr = serializeLakeData(lake_data)
   const showGridValue = show_grid !== undefined ? (show_grid ? 1 : 0) : 1
 
   let expiresAt: string | null = null
@@ -85,8 +107,8 @@ router.post('/shares', validate(schema.createShare), (req, res) => {
     INSERT INTO shares (
       id, token, model_id, name, description, location_lat, location_lng,
       city_name, date_time, building_count, scene_data, canvas_size, show_grid,
-      grid_divisions, terrain_data, expires_at, view_count, is_read_only
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+      grid_divisions, terrain_data, lake_data, expires_at, view_count, is_read_only
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
   `).run(
     id,
     token,
@@ -103,6 +125,7 @@ router.post('/shares', validate(schema.createShare), (req, res) => {
     showGridValue,
     grid_divisions ?? 200,
     terrainStr,
+    lakeStr,
     expiresAt
   )
 

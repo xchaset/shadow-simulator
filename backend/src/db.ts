@@ -44,6 +44,8 @@ db.exec(`
     canvas_size     REAL NOT NULL DEFAULT 2000,
     show_grid       INTEGER NOT NULL DEFAULT 1,
     grid_divisions  INTEGER NOT NULL DEFAULT 200,
+    terrain_data    TEXT DEFAULT NULL,
+    lake_data       TEXT DEFAULT NULL,
     thumbnail       TEXT DEFAULT NULL,
     sort_order      INTEGER DEFAULT 0,
     created_at      TEXT DEFAULT (datetime('now', 'localtime')),
@@ -110,6 +112,7 @@ db.exec(`
     grid_divisions   INTEGER NOT NULL DEFAULT 200,
     thumbnail        TEXT DEFAULT NULL,
     terrain_data     TEXT DEFAULT NULL,
+    lake_data        TEXT DEFAULT NULL,
     created_at       TEXT DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE
   );
@@ -124,6 +127,14 @@ const versionColumnNames = versionColumns.map(c => c.name)
 
 if (!versionColumnNames.includes('terrain_data')) {
   db.exec(`ALTER TABLE model_versions ADD COLUMN terrain_data TEXT DEFAULT NULL`)
+}
+
+if (!columnNames.includes('lake_data')) {
+  db.exec(`ALTER TABLE models ADD COLUMN lake_data TEXT DEFAULT NULL`)
+}
+
+if (!versionColumnNames.includes('lake_data')) {
+  db.exec(`ALTER TABLE model_versions ADD COLUMN lake_data TEXT DEFAULT NULL`)
 }
 
 // ─── Migration: Add shares table for share functionality ────────────────────
@@ -145,6 +156,7 @@ db.exec(`
     show_grid        INTEGER NOT NULL DEFAULT 1,
     grid_divisions   INTEGER NOT NULL DEFAULT 200,
     terrain_data     TEXT DEFAULT NULL,
+    lake_data        TEXT DEFAULT NULL,
     expires_at       TEXT DEFAULT NULL,
     view_count       INTEGER NOT NULL DEFAULT 0,
     is_read_only     INTEGER NOT NULL DEFAULT 1,
@@ -155,6 +167,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_shares_token ON shares(token);
   CREATE INDEX IF NOT EXISTS idx_shares_model ON shares(model_id);
 `)
+
+// ─── Migration: Add lake_data column to shares table ──────────────────
+
+const sharesColumns = db.prepare(`PRAGMA table_info(shares)`).all() as any[]
+const sharesColumnNames = sharesColumns.map(c => c.name)
+
+if (!sharesColumnNames.includes('lake_data')) {
+  db.exec(`ALTER TABLE shares ADD COLUMN lake_data TEXT DEFAULT NULL`)
+}
 
 // ─── Migration: Add custom_templates table for merged templates ─────────────
 

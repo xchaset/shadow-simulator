@@ -16,6 +16,10 @@ export type BuildingType =
   | 'ai-complex'
   | 'river'
   | 'glb'
+  | 'girder-bridge'
+  | 'arch-bridge'
+  | 'suspension-bridge'
+  | 'cable-stayed-bridge'
 
 export interface Building {
   id: string
@@ -71,8 +75,10 @@ export interface TerrainEditorState {
   brushMode: TerrainBrushMode
   /** 笔刷半径（世界单位） */
   brushRadius: number
-  /** 笔刷强度 */
+  /** 笔刷强度（每次绘制增加/减少的高度） */
   brushStrength: number
+  /** 笔刷最大高度限制（提升地形时的最大高度） */
+  brushMaxHeight: number
   /** 笔刷位置（世界坐标） */
   brushPosition: [number, number] | null
   /** 是否正在绘制 */
@@ -135,6 +141,8 @@ export interface Model {
   scene_data?: Building[]
   /** 地貌数据 */
   terrain_data?: TerrainData
+  /** 湖泊数据 */
+  lake_data?: LakeState
   // 画布设置（与模型绑定）
   canvas_size?: number  // 画布尺寸（默认 2000）
   show_grid?: boolean  // 是否显示网格（默认 true）

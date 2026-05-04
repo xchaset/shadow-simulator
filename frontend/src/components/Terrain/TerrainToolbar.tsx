@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Slider, Radio, Space, Tooltip, Divider, Switch, Collapse, ColorPicker } from 'antd'
+import { Button, Slider, Radio, Space, Tooltip, Divider, Switch, Collapse, ColorPicker, InputNumber } from 'antd'
 import type { CollapseProps } from 'antd'
 import {
   RiseOutlined,
@@ -47,6 +47,12 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
 
   const handleStrengthChange = (value: number) => {
     setTerrainEditor({ brushStrength: value })
+  }
+
+  const handleMaxHeightChange = (value: number | null) => {
+    if (value !== null && value > 0) {
+      setTerrainEditor({ brushMaxHeight: value })
+    }
   }
 
   const handleClear = () => {
@@ -144,16 +150,47 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
 
       {/* 笔刷强度 */}
       <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 6 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#666', marginBottom: 6 }}>
           <span>笔刷强度</span>
-          <span>{terrainEditor.brushStrength.toFixed(1)}</span>
+          <InputNumber
+            min={0.5}
+            step={0.5}
+            value={terrainEditor.brushStrength}
+            onChange={(value) => value !== null && handleStrengthChange(value)}
+            style={{ width: 80 }}
+            size="small"
+          />
         </div>
         <Slider
           min={0.5}
-          max={20}
+          max={500}
           step={0.5}
           value={terrainEditor.brushStrength}
           onChange={handleStrengthChange}
+        />
+      </div>
+
+      {/* 最大高度限制 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#666', marginBottom: 6 }}>
+          <span>最大高度限制</span>
+          <InputNumber
+            min={10}
+            step={10}
+            value={terrainEditor.brushMaxHeight}
+            onChange={handleMaxHeightChange}
+            style={{ width: 80 }}
+            size="small"
+            addonAfter="m"
+          />
+        </div>
+        <Slider
+          min={10}
+          max={2000}
+          step={10}
+          value={terrainEditor.brushMaxHeight}
+          onChange={handleMaxHeightChange}
+          tooltip={{ formatter: v => `${v}m` }}
         />
       </div>
 

@@ -89,6 +89,11 @@ export interface ModelDTO {
   date_time: string
   building_count: number
   scene_data?: Building[]
+  canvas_size: number
+  show_grid: boolean
+  grid_divisions: number
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number; waterMask?: number[] } | null
+  lake_data?: { enabled: boolean; waterLevel: number; waterColor: string; waveHeight: number; opacity: number } | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -116,7 +121,8 @@ export interface UpdateModelParams {
   canvas_size?: number
   show_grid?: boolean
   grid_divisions?: number
-  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number; waterMask?: number[] } | null
+  lake_data?: { enabled: boolean; waterLevel: number; waterColor: string; waveHeight: number; opacity: number } | null
 }
 
 export const modelApi = {
@@ -189,7 +195,8 @@ export interface ModelVersionDTO {
   show_grid: boolean
   grid_divisions: number
   thumbnail?: string
-  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number; waterMask?: number[] } | null
+  lake_data?: { enabled: boolean; waterLevel: number; waterColor: string; waveHeight: number; opacity: number } | null
   created_at: string
 }
 
@@ -228,7 +235,8 @@ export interface ShareDTO {
   canvas_size: number
   show_grid: boolean
   grid_divisions: number
-  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number; waterMask?: number[] } | null
+  lake_data?: { enabled: boolean; waterLevel: number; waterColor: string; waveHeight: number; opacity: number } | null
   expires_at: string | null
   view_count: number
   is_read_only: boolean
@@ -247,7 +255,8 @@ export interface CreateShareParams {
   canvas_size?: number
   show_grid?: boolean
   grid_divisions?: number
-  terrain_data?: { resolution: number; heights: number[]; maxHeight: number } | null
+  terrain_data?: { resolution: number; heights: number[]; maxHeight: number; waterMask?: number[] } | null
+  lake_data?: { enabled: boolean; waterLevel: number; waterColor: string; waveHeight: number; opacity: number } | null
   expires_in_hours?: number
 }
 

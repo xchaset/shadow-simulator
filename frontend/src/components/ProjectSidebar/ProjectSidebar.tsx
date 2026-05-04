@@ -44,6 +44,7 @@ export function ProjectSidebar() {
     setCanvasSize, setShowGrid, setGridDivisions, setTerrainData,
     terrainEditor, setTerrainEditor,
     measurementTool,
+    lake, setLake,
   } = useStore()
 
   const [models, setModels] = useState<Record<string, Model[]>>({})
@@ -175,21 +176,26 @@ export function ProjectSidebar() {
     if (model.show_grid !== undefined) setShowGrid(model.show_grid)
     if (model.grid_divisions !== undefined) setGridDivisions(model.grid_divisions)
     if (model.terrain_data) {
-      setTerrainData({
+      const terrainData = {
         ...model.terrain_data,
         heights: new Float32Array(model.terrain_data.heights),
-      })
+      }
+      if (model.terrain_data.waterMask) {
+        terrainData.waterMask = new Uint8Array(model.terrain_data.waterMask)
+      }
+      setTerrainData(terrainData)
     } else {
       setTerrainData(null)
+    }
+    if (model.lake_data) {
+      setLake(model.lake_data)
     }
     setCurrentModelId(model.id)
     setCurrentDirectoryId(model.directory_id)
     setDirty(false)
-    // 记录到后端最近打开
     recentModelApi.record(model.id).catch(() => {})
-    // 本地记录 lastModelId
     saveState({ lastModelId: model.id })
-  }, [setBuildings, setLocation, setDateTime, setCanvasSize, setShowGrid, setGridDivisions, setTerrainData, setCurrentModelId, setCurrentDirectoryId, setDirty])
+  }, [setBuildings, setLocation, setDateTime, setCanvasSize, setShowGrid, setGridDivisions, setTerrainData, setLake, setCurrentModelId, setCurrentDirectoryId, setDirty])
 
   // ─── Directory operations ───────────────────────────────
 
@@ -773,7 +779,7 @@ export function ProjectSidebar() {
       return
     }
     
-    const { terrainData, canvasSize, showGrid, gridDivisions, dirty } = useStore.getState()
+    const { terrainData, canvasSize, showGrid, gridDivisions, dirty, lake } = useStore.getState()
     console.log('[ProjectSidebar] 保存前的状态:', {
       currentModelId,
       dirty,
@@ -782,8 +788,10 @@ export function ProjectSidebar() {
         resolution: terrainData.resolution,
         heightsLength: terrainData.heights?.length,
         maxHeight: terrainData.maxHeight,
+        hasWaterMask: !!terrainData.waterMask,
         sampleHeights: terrainData.heights ? Array.from(terrainData.heights.slice(0, 5)) : null
       } : null,
+      lake,
       canvasSize,
       showGrid,
       gridDivisions,
@@ -795,14 +803,24 @@ export function ProjectSidebar() {
         resolution: terrainData.resolution,
         heights: Array.from(terrainData.heights),
         maxHeight: terrainData.maxHeight,
+        waterMask: terrainData.waterMask ? Array.from(terrainData.waterMask) : undefined,
       } : null
       
       console.log('[ProjectSidebar] 准备发送的 terrain_data:', terrainDataToSend ? {
         resolution: terrainDataToSend.resolution,
         heightsLength: terrainDataToSend.heights?.length,
         maxHeight: terrainDataToSend.maxHeight,
+        hasWaterMask: !!terrainDataToSend.waterMask,
         sampleHeights: terrainDataToSend.heights?.slice(0, 5)
       } : 'null')
+      
+      const lakeDataToSend = {
+        enabled: lake.enabled,
+        waterLevel: lake.waterLevel,
+        waterColor: lake.waterColor,
+        waveHeight: lake.waveHeight,
+        opacity: lake.opacity,
+      }
       
       await modelApi.update(currentModelId, {
         scene_data: buildings,
@@ -814,6 +832,7 @@ export function ProjectSidebar() {
         show_grid: showGrid,
         grid_divisions: gridDivisions,
         terrain_data: terrainDataToSend,
+        lake_data: lakeDataToSend,
       })
       
       console.log('[ProjectSidebar] 保存请求发送成功')

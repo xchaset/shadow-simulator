@@ -29,11 +29,15 @@ function parseRow(row: any) {
   if (typeof row.terrain_data === 'string') {
     try {
       const parsed = JSON.parse(row.terrain_data)
-      // heights 保持为普通 number[]，由前端在加载时转换为 Float32Array
       row.terrain_data = parsed
     } catch { row.terrain_data = null }
   }
-  // 将 show_grid 从 INTEGER (0/1) 转换为 boolean
+  if (typeof row.lake_data === 'string') {
+    try {
+      const parsed = JSON.parse(row.lake_data)
+      row.lake_data = parsed
+    } catch { row.lake_data = null }
+  }
   if (row.show_grid !== undefined && row.show_grid !== null) {
     row.show_grid = !!row.show_grid
   }
@@ -42,28 +46,29 @@ function parseRow(row: any) {
 
 /** Serialize terrain data for storage */
 function serializeTerrainData(terrain_data: any): string | null {
-  console.log('[models.ts] serializeTerrainData 被调用，输入:', {
-    terrainDataExists: !!terrain_data,
-    terrainDataType: typeof terrain_data,
-    isArray: Array.isArray(terrain_data),
-    heightsExists: terrain_data?.heights !== undefined && terrain_data?.heights !== null,
-    heightsType: terrain_data?.heights ? typeof terrain_data.heights : 'N/A',
-    heightsIsArray: terrain_data?.heights ? Array.isArray(terrain_data.heights) : 'N/A',
-    heightsLength: terrain_data?.heights?.length
-  })
-  
   if (!terrain_data || !terrain_data.heights) {
-    console.log('[models.ts] serializeTerrainData 返回 null')
     return null
   }
   
-  const result = JSON.stringify({
-    ...terrain_data,
+  const toSerialize = {
+    resolution: terrain_data.resolution,
     heights: Array.from(terrain_data.heights),
-  })
+    maxHeight: terrain_data.maxHeight,
+  }
   
-  console.log('[models.ts] serializeTerrainData 序列化结果长度:', result.length)
-  return result
+  if (terrain_data.waterMask) {
+    toSerialize.waterMask = Array.from(terrain_data.waterMask)
+  }
+  
+  return JSON.stringify(toSerialize)
+}
+
+/** Serialize lake data for storage */
+function serializeLakeData(lake_data: any): string | null {
+  if (!lake_data) {
+    return null
+  }
+  return JSON.stringify(lake_data)
 }
 
 /** Create a version snapshot for a model */
@@ -84,8 +89,8 @@ function createVersionSnapshot(modelId: string, modelData: any) {
     INSERT INTO model_versions (
       id, model_id, version_number, name, description, location_lat, location_lng,
       city_name, date_time, building_count, scene_data, canvas_size, show_grid,
-      grid_divisions, thumbnail, terrain_data
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      grid_divisions, thumbnail, terrain_data, lake_data
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     versionId,
     modelId,
@@ -102,7 +107,8 @@ function createVersionSnapshot(modelId: string, modelData: any) {
     modelData.show_grid !== undefined ? (modelData.show_grid ? 1 : 0) : 1,
     modelData.grid_divisions ?? 200,
     modelData.thumbnail || null,
-    modelData.terrain_data || null
+    modelData.terrain_data || null,
+    modelData.lake_data || null
   )
   
   return { version_id: versionId, version_number: nextVersionNumber }
@@ -119,6 +125,12 @@ function parseVersionRow(row: any) {
       const parsed = JSON.parse(row.terrain_data)
       row.terrain_data = parsed
     } catch { row.terrain_data = null }
+  }
+  if (typeof row.lake_data === 'string') {
+    try {
+      const parsed = JSON.parse(row.lake_data)
+      row.lake_data = parsed
+    } catch { row.lake_data = null }
   }
   if (row.show_grid !== undefined && row.show_grid !== null) {
     row.show_grid = !!row.show_grid
@@ -151,27 +163,26 @@ router.post('/directories/:dirId/models', validate(schema.createModel), (req, re
   const {
     name, description, location_lat, location_lng,
     city_name, date_time, scene_data, sort_order,
-    canvas_size, show_grid, grid_divisions, terrain_data,
+    canvas_size, show_grid, grid_divisions, terrain_data, lake_data,
   } = req.body
 
   const { str: sceneStr, count: buildingCount } = normalizeSceneData(scene_data)
   const id = uuidv4()
   const dt = date_time || new Date().toISOString()
 
-  // 序列化 terrain_data
   const terrainStr = serializeTerrainData(terrain_data)
+  const lakeStr = serializeLakeData(lake_data)
   const showGridValue = show_grid !== undefined ? (show_grid ? 1 : 0) : 1
 
   db.prepare(`
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
                         city_name, date_time, building_count, scene_data, sort_order,
-                        canvas_size, show_grid, grid_divisions, terrain_data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        canvas_size, show_grid, grid_divisions, terrain_data, lake_data)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, dirId, name, description, location_lat, location_lng,
          city_name, dt, buildingCount, sceneStr, sort_order,
-         canvas_size ?? 2000, showGridValue, grid_divisions ?? 200, terrainStr)
+         canvas_size ?? 2000, showGridValue, grid_divisions ?? 200, terrainStr, lakeStr)
 
-  // 创建初始版本快照
   createVersionSnapshot(id, {
     name,
     description,
@@ -185,6 +196,7 @@ router.post('/directories/:dirId/models', validate(schema.createModel), (req, re
     show_grid: showGridValue,
     grid_divisions: grid_divisions ?? 200,
     terrain_data: terrainStr,
+    lake_data: lakeStr,
   })
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(id)
@@ -222,7 +234,7 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
 
   const { name, description, location_lat, location_lng, city_name,
           date_time, scene_data, sort_order,
-          canvas_size, show_grid, grid_divisions, terrain_data } = req.body
+          canvas_size, show_grid, grid_divisions, terrain_data, lake_data } = req.body
 
   const updates: string[] = []
   const values: any[] = []
@@ -285,21 +297,17 @@ router.put('/models/:id', validate(schema.updateModel), (req, res) => {
   }
 
   let terrainStr: string | null | undefined
-  console.log('[models.ts] 检查 terrain_data:', {
-    terrain_data,
-    isUndefined: terrain_data === undefined,
-    isNull: terrain_data === null
-  })
-  
   if (terrain_data !== undefined) {
-    console.log('[models.ts] terrain_data 不为 undefined，准备序列化')
     terrainStr = serializeTerrainData(terrain_data)
-    console.log('[models.ts] 序列化后的 terrainStr:', terrainStr ? `[${terrainStr.length} chars]` : 'null')
     updates.push('terrain_data = ?'); values.push(terrainStr)
     updatedData.terrain_data = terrainStr
-    console.log('[models.ts] 已添加 terrain_data 到更新列表')
-  } else {
-    console.log('[models.ts] terrain_data 为 undefined，不更新')
+  }
+
+  let lakeStr: string | null | undefined
+  if (lake_data !== undefined) {
+    lakeStr = serializeLakeData(lake_data)
+    updates.push('lake_data = ?'); values.push(lakeStr)
+    updatedData.lake_data = lakeStr
   }
 
   if (updates.length === 0) {
@@ -334,12 +342,12 @@ router.post('/models/:id/copy', validate(schema.getModel), (req, res) => {
   db.prepare(`
     INSERT INTO models (id, directory_id, name, description, location_lat, location_lng,
                         city_name, date_time, building_count, scene_data, sort_order,
-                        canvas_size, show_grid, grid_divisions, terrain_data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        canvas_size, show_grid, grid_divisions, terrain_data, lake_data)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(newId, targetDirId, newName, existing.description, existing.location_lat,
          existing.location_lng, existing.city_name, existing.date_time,
          existing.building_count, existing.scene_data, existing.sort_order,
-         existing.canvas_size, existing.show_grid, existing.grid_divisions, existing.terrain_data)
+         existing.canvas_size, existing.show_grid, existing.grid_divisions, existing.terrain_data, existing.lake_data)
 
   const row = db.prepare('SELECT * FROM models WHERE id = ?').get(newId)
   res.status(201).json(parseRow(row))
@@ -392,7 +400,7 @@ router.get('/recent-models', (req, res) => {
   const rows = db.prepare(`
     SELECT m.id, m.directory_id, m.name, m.description, m.location_lat, m.location_lng,
            m.city_name, m.date_time, m.building_count, m.canvas_size, m.show_grid, m.grid_divisions,
-           m.terrain_data, m.sort_order, m.created_at, m.updated_at, rm.opened_at
+           m.terrain_data, m.lake_data, m.sort_order, m.created_at, m.updated_at, rm.opened_at
     FROM recent_models rm
     JOIN models m ON m.id = rm.model_id
     ORDER BY rm.opened_at DESC
@@ -467,13 +475,13 @@ router.post('/models/:id/versions/:versionId/restore', validate(schema.getVersio
     UPDATE models SET
       name = ?, description = ?, location_lat = ?, location_lng = ?,
       city_name = ?, date_time = ?, building_count = ?, scene_data = ?,
-      canvas_size = ?, show_grid = ?, grid_divisions = ?, terrain_data = ?,
+      canvas_size = ?, show_grid = ?, grid_divisions = ?, terrain_data = ?, lake_data = ?,
       updated_at = datetime('now', 'localtime')
     WHERE id = ?
   `).run(
     version.name, version.description, version.location_lat, version.location_lng,
     version.city_name, version.date_time, version.building_count, version.scene_data,
-    version.canvas_size, version.show_grid, version.grid_divisions, version.terrain_data,
+    version.canvas_size, version.show_grid, version.grid_divisions, version.terrain_data, version.lake_data,
     id
   )
   
@@ -510,7 +518,7 @@ router.post('/models/merge', validate(schema.mergeModels), (req, res) => {
   const models = db.prepare(`
     SELECT id, directory_id, name, description, location_lat, location_lng,
            city_name, date_time, building_count, scene_data, canvas_size,
-           show_grid, grid_divisions, terrain_data, sort_order
+           show_grid, grid_divisions, terrain_data, lake_data, sort_order
     FROM models
     WHERE id IN (${placeholders})
     ORDER BY created_at ASC
@@ -608,6 +616,12 @@ router.post('/models/merge', validate(schema.mergeModels), (req, res) => {
         : firstModel.terrain_data
     ) : null
     
+    const lakeStr = firstModel.lake_data ? serializeLakeData(
+      typeof firstModel.lake_data === 'string'
+        ? JSON.parse(firstModel.lake_data)
+        : firstModel.lake_data
+    ) : null
+    
     const showGridValue = firstModel.show_grid !== undefined 
       ? (firstModel.show_grid ? 1 : 0) 
       : 1
@@ -616,8 +630,8 @@ router.post('/models/merge', validate(schema.mergeModels), (req, res) => {
       INSERT INTO models (
         id, directory_id, name, description, location_lat, location_lng,
         city_name, date_time, building_count, scene_data, sort_order,
-        canvas_size, show_grid, grid_divisions, terrain_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        canvas_size, show_grid, grid_divisions, terrain_data, lake_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       newId,
       target_directory_id,
@@ -634,9 +648,9 @@ router.post('/models/merge', validate(schema.mergeModels), (req, res) => {
       showGridValue,
       firstModel.grid_divisions ?? 200,
       terrainStr,
+      lakeStr,
     )
     
-    // 创建初始版本快照
     createVersionSnapshot(newId, {
       name,
       description: description || '',
@@ -650,6 +664,7 @@ router.post('/models/merge', validate(schema.mergeModels), (req, res) => {
       show_grid: showGridValue,
       grid_divisions: firstModel.grid_divisions ?? 200,
       terrain_data: terrainStr,
+      lake_data: lakeStr,
     })
     
     const row = db.prepare('SELECT * FROM models WHERE id = ?').get(newId)
