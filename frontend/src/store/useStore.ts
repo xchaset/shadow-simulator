@@ -147,6 +147,7 @@ export const useStore = create<AppState>((set, get) => ({
       resolution: terrainData.resolution,
       heights: new Float32Array(terrainData.heights),
       maxHeight: terrainData.maxHeight,
+      waterMask: terrainData.waterMask ? new Uint8Array(terrainData.waterMask) : undefined,
     }
     set({
       terrainEditor: {
@@ -166,6 +167,7 @@ export const useStore = create<AppState>((set, get) => ({
       resolution: terrainData.resolution,
       heights: new Float32Array(terrainData.heights),
       maxHeight: terrainData.maxHeight,
+      waterMask: terrainData.waterMask ? new Uint8Array(terrainData.waterMask) : undefined,
     } : null
     set({
       terrainData: last,
@@ -187,6 +189,7 @@ export const useStore = create<AppState>((set, get) => ({
       resolution: terrainData.resolution,
       heights: new Float32Array(terrainData.heights),
       maxHeight: terrainData.maxHeight,
+      waterMask: terrainData.waterMask ? new Uint8Array(terrainData.waterMask) : undefined,
     } : null
     set({
       terrainData: next,

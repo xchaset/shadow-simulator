@@ -78,6 +78,9 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
         case 'r':
           setTerrainEditor({ brushMode: 'flatten' })
           break
+        case 'h':
+          setTerrainEditor({ brushMode: 'water' })
+          break
         case 'z':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault()

@@ -77,6 +77,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
   const flushGeometry = useCallback(() => {
     const geometry = geometryRef.current
     const heights = heightsRef.current
+    const waterMask = waterMaskRef.current
     if (!geometry) return
 
     const [minX, minY, maxX, maxY] = dirtyBoundsRef.current
@@ -98,10 +99,19 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       pos.needsUpdate = true
     }
 
-    // 更新 waterMask 属性
-    const waterMask = waterMaskRef.current
     if (waterMask && geometry.getAttribute('aWaterMask')) {
       const maskAttr = geometry.getAttribute('aWaterMask') as any
+      const x0 = Math.max(0, Math.floor(minX))
+      const y0 = Math.max(0, Math.floor(minY))
+      const x1 = Math.min(res - 1, Math.ceil(maxX))
+      const y1 = Math.min(res - 1, Math.ceil(maxY))
+
+      for (let iy = y0; iy <= y1; iy++) {
+        for (let ix = x0; ix <= x1; ix++) {
+          const idx = iy * res + ix
+          maskAttr.setX(idx, waterMask[idx])
+        }
+      }
       maskAttr.needsUpdate = true
     }
 
