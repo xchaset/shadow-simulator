@@ -379,6 +379,97 @@ export const BUILDING_TEMPLATES: BuildingTemplate[] = [
       },
     ],
   },
+  {
+    id: 'basketball-court-template',
+    name: '标准篮球场',
+    category: '体育设施',
+    description: '标准尺寸篮球场，含篮架和场地线',
+    icon: 'basketball-court',
+    buildings: [
+      {
+        type: 'basketball-court',
+        params: {
+          length: 28,
+          width: 15,
+          floorThickness: 0.2,
+          poleHeight: 4,
+          backboardWidth: 1.8,
+          backboardHeight: 1.05,
+        },
+        position: [0, 0],
+        rotation: 0,
+        color: '#D2B48C',
+      },
+    ],
+  },
+  {
+    id: 'football-field-template',
+    name: '标准足球场',
+    category: '体育设施',
+    description: '标准尺寸足球场，含球门和场地线',
+    icon: 'football-field',
+    buildings: [
+      {
+        type: 'football-field',
+        params: {
+          length: 105,
+          width: 68,
+          floorThickness: 0.2,
+          goalHeight: 2.44,
+          goalWidth: 7.32,
+        },
+        position: [0, 0],
+        rotation: 0,
+        color: '#228B22',
+      },
+    ],
+  },
+  {
+    id: 'tennis-court-template',
+    name: '标准网球场',
+    category: '体育设施',
+    description: '标准尺寸网球场，含球网和场地线',
+    icon: 'tennis-court',
+    buildings: [
+      {
+        type: 'tennis-court',
+        params: {
+          length: 23.77,
+          width: 10.97,
+          singleWidth: 8.23,
+          floorThickness: 0.2,
+          netHeight: 0.914,
+        },
+        position: [0, 0],
+        rotation: 0,
+        color: '#4169E1',
+      },
+    ],
+  },
+  {
+    id: 'gymnasium-template',
+    name: '综合体育馆',
+    category: '体育设施',
+    description: '大型综合体育馆，含室内场地和看台',
+    icon: 'gymnasium',
+    buildings: [
+      {
+        type: 'gymnasium',
+        params: {
+          length: 80,
+          width: 60,
+          height: 25,
+          wallThickness: 1.5,
+          roofHeight: 12,
+          entranceWidth: 12,
+          entranceHeight: 6,
+        },
+        position: [0, 0],
+        rotation: 0,
+        color: '#F5F5DC',
+      },
+    ],
+  },
 ]
 
 export function getTemplatesByCategory(): Record<string, BuildingTemplate[]> {

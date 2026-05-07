@@ -11,9 +11,10 @@ import {
   DeleteOutlined,
   EnvironmentOutlined,
   ExperimentOutlined,
+  FontColorsOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../../store/useStore'
-import type { TerrainBrushMode } from '../../types'
+import type { TerrainBrushMode, TerrainColorType } from '../../types'
 
 
 interface TerrainToolbarProps {
@@ -26,6 +27,15 @@ const BRUSH_MODES: { mode: TerrainBrushMode; icon: React.ReactNode; label: strin
   { mode: 'smooth', icon: <ScanOutlined />, label: '平滑 (E)' },
   { mode: 'flatten', icon: <BorderOutlined />, label: '平整 (R)' },
   { mode: 'water', icon: <ExperimentOutlined />, label: '水笔刷 (H)' },
+  { mode: 'color', icon: <FontColorsOutlined />, label: '着色 (C)' },
+]
+
+const TERRAIN_COLOR_TYPES: { type: TerrainColorType; label: string; color: string }[] = [
+  { type: 0, label: '默认', color: '#8B7355' },
+  { type: 1, label: '森林', color: '#228B22' },
+  { type: 2, label: '雪山', color: '#F5F5F5' },
+  { type: 3, label: '岩石', color: '#696969' },
+  { type: 4, label: '草地', color: '#90EE90' },
 ]
 
 export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
@@ -55,19 +65,31 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
     }
   }
 
+  const handleColorTypeChange = (type: TerrainColorType) => {
+    setTerrainEditor({ brushColorType: type })
+  }
+
+  const DEFAULT_TERRAIN_COLOR: [number, number, number] = [139 / 255, 115 / 255, 85 / 255]
+
   const handleClear = () => {
     const { terrainData } = useStore.getState()
     if (!terrainData) return
     const heights = new Float32Array(terrainData.heights.length)
+    const colorData = new Float32Array(terrainData.heights.length * 3)
+    for (let i = 0; i < terrainData.heights.length; i++) {
+      colorData[i * 3] = DEFAULT_TERRAIN_COLOR[0]
+      colorData[i * 3 + 1] = DEFAULT_TERRAIN_COLOR[1]
+      colorData[i * 3 + 2] = DEFAULT_TERRAIN_COLOR[2]
+    }
     useStore.getState().setTerrainData({
       resolution: terrainData.resolution,
       heights,
       maxHeight: terrainData.maxHeight,
+      colorData,
     })
     onReset()
   }
 
-  // 键盘快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -86,6 +108,9 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
           break
         case 'h':
           setTerrainEditor({ brushMode: 'water' })
+          break
+        case 'c':
+          setTerrainEditor({ brushMode: 'color' })
           break
         case 'z':
           if (e.ctrlKey || e.metaKey) {
@@ -106,6 +131,9 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
         background: '#fff',
         borderTop: '1px solid #e8e8e8',
         padding: '12px 16px',
+        maxHeight: 350,
+        overflowY: 'auto',
+        flexShrink: 0,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -113,7 +141,6 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
         <span style={{ fontWeight: 600, fontSize: 14 }}>地貌编辑</span>
       </div>
 
-      {/* 笔刷模式 */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>笔刷模式</div>
         <Radio.Group
@@ -133,7 +160,39 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
         </Radio.Group>
       </div>
 
-      {/* 笔刷大小 */}
+      {terrainEditor.brushMode === 'color' && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>地貌类型</div>
+          <Radio.Group
+            value={terrainEditor.brushColorType}
+            onChange={e => handleColorTypeChange(e.target.value)}
+            buttonStyle="solid"
+            size="small"
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}
+          >
+            {TERRAIN_COLOR_TYPES.map(({ type, label, color }) => (
+              <Tooltip key={type} title={label}>
+                <Radio.Button value={type} style={{ padding: '4px 10px' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 12,
+                      height: 12,
+                      borderRadius: 2,
+                      backgroundColor: color,
+                      border: '1px solid #ccc',
+                      marginRight: 4,
+                      verticalAlign: 'middle',
+                    }}
+                  />
+                  <span style={{ verticalAlign: 'middle' }}>{label}</span>
+                </Radio.Button>
+              </Tooltip>
+            ))}
+          </Radio.Group>
+        </div>
+      )}
+
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 6 }}>
           <span>笔刷大小</span>
@@ -148,55 +207,56 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
         />
       </div>
 
-      {/* 笔刷强度 */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#666', marginBottom: 6 }}>
-          <span>笔刷强度</span>
-          <InputNumber
+      {terrainEditor.brushMode !== 'water' && terrainEditor.brushMode !== 'color' && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#666', marginBottom: 6 }}>
+            <span>笔刷强度</span>
+            <InputNumber
+              min={0.5}
+              step={0.5}
+              value={terrainEditor.brushStrength}
+              onChange={(value) => value !== null && handleStrengthChange(value)}
+              style={{ width: 80 }}
+              size="small"
+            />
+          </div>
+          <Slider
             min={0.5}
+            max={500}
             step={0.5}
             value={terrainEditor.brushStrength}
-            onChange={(value) => value !== null && handleStrengthChange(value)}
-            style={{ width: 80 }}
-            size="small"
+            onChange={handleStrengthChange}
           />
         </div>
-        <Slider
-          min={0.5}
-          max={500}
-          step={0.5}
-          value={terrainEditor.brushStrength}
-          onChange={handleStrengthChange}
-        />
-      </div>
+      )}
 
-      {/* 最大高度限制 */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#666', marginBottom: 6 }}>
-          <span>最大高度限制</span>
-          <InputNumber
+      {terrainEditor.brushMode !== 'water' && terrainEditor.brushMode !== 'color' && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#666', marginBottom: 6 }}>
+            <span>最大高度限制</span>
+            <InputNumber
+              min={10}
+              step={10}
+              value={terrainEditor.brushMaxHeight}
+              onChange={handleMaxHeightChange}
+              style={{ width: 80 }}
+              size="small"
+              addonAfter="m"
+            />
+          </div>
+          <Slider
             min={10}
+            max={2000}
             step={10}
             value={terrainEditor.brushMaxHeight}
             onChange={handleMaxHeightChange}
-            style={{ width: 80 }}
-            size="small"
-            addonAfter="m"
+            tooltip={{ formatter: v => `${v}m` }}
           />
         </div>
-        <Slider
-          min={10}
-          max={2000}
-          step={10}
-          value={terrainEditor.brushMaxHeight}
-          onChange={handleMaxHeightChange}
-          tooltip={{ formatter: v => `${v}m` }}
-        />
-      </div>
+      )}
 
       <Divider style={{ margin: '12px 0' }} />
 
-      {/* 湖泊设置 */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <ExperimentOutlined style={{ fontSize: 16, color: '#1677ff' }} />
@@ -210,7 +270,6 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
 
         {lake.enabled && (
           <>
-            {/* 水位高度 */}
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
                 <span>水位高度</span>
@@ -225,7 +284,6 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
               />
             </div>
 
-            {/* 水颜色 */}
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>水颜色</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -238,7 +296,6 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
               </div>
             </div>
 
-            {/* 波浪高度 */}
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
                 <span>波浪高度</span>
@@ -253,7 +310,6 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
               />
             </div>
 
-            {/* 透明度 */}
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
                 <span>透明度</span>
@@ -274,7 +330,6 @@ export function TerrainToolbar({ onReset }: TerrainToolbarProps) {
 
       <Divider style={{ margin: '12px 0' }} />
 
-      {/* 操作按钮 */}
       <Space wrap size="small">
         <Tooltip title="撤销 (Ctrl+Z)">
           <Button

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { SceneCanvas } from './components/Scene/SceneCanvas'
 import { Toolbar } from './components/Toolbar/Toolbar'
 import { Sidebar } from './components/Sidebar/Sidebar'
@@ -7,6 +7,7 @@ import { MapModal } from './components/MapPicker/MapModal'
 import { ProjectSidebar } from './components/ProjectSidebar/ProjectSidebar'
 import { HelpButton } from './components/HelpGuide/HelpButton'
 import { ShadowAnalysisPanel } from './components/ShadowAnalysis/ShadowAnalysisPanel'
+import { ShadowHeatmapPanel } from './components/ShadowAnalysis/ShadowHeatmapPanel'
 import { usePlayback } from './hooks/usePlayback'
 import { useStore } from './store/useStore'
 import { shareApi } from './utils/api'
@@ -17,9 +18,11 @@ import './App.css'
 function App() {
   const [mapOpen, setMapOpen] = useState(false)
   const [shadowAnalysisOpen, setShadowAnalysisOpen] = useState(false)
+  const [shadowHeatmapOpen, setShadowHeatmapOpen] = useState(false)
   const [shareLoading, setShareLoading] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
   
+  const appRef = useRef<HTMLDivElement>(null)
   const shareMode = useStore(s => s.shareMode)
   const setShareMode = useStore(s => s.setShareMode)
   const setBuildings = useStore(s => s.setBuildings)
@@ -166,10 +169,11 @@ function App() {
   const isReadOnly = shareMode.isReadOnly
 
   return (
-    <div className="app">
+    <div className="app" ref={appRef}>
       <Toolbar 
         onOpenMap={() => setMapOpen(true)}
         onOpenShadowAnalysis={() => setShadowAnalysisOpen(true)}
+        onOpenShadowHeatmap={() => setShadowHeatmapOpen(true)}
       />
       <div className="main-content">
         {!isReadOnly && <ProjectSidebar />}
@@ -178,6 +182,9 @@ function App() {
           <TimelinePanel />
           {shadowAnalysisOpen && (
             <ShadowAnalysisPanel onClose={() => setShadowAnalysisOpen(false)} />
+          )}
+          {shadowHeatmapOpen && (
+            <ShadowHeatmapPanel onClose={() => setShadowHeatmapOpen(false)} />
           )}
           
           {shareMode.isShareMode && shareMode.shareData && (

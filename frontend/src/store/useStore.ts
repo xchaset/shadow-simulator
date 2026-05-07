@@ -1,6 +1,8 @@
 import { create } from 'zustand'
-import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode, ShadowAnalysisReport, MeasurementToolState, MeasurementMode, MeasurementPoint, MeasurementResult, CustomTemplate, LakeState } from '../types'
+import type { AppState, Building, Directory, Location, Model, PlaybackState, TerrainData, TerrainEditorState, TerrainBrushMode, TerrainColorType, ShadowAnalysisReport, MeasurementToolState, MeasurementMode, MeasurementPoint, MeasurementResult, CustomTemplate, LakeState, RoadEditorState, RoadHeightMode, RoadMode, RoadLaneConfig, ShadowHeatmapMode, ShadowHeatmapResult, Annotation, AnnotationToolState, AnnotationMode, AnnotationColor } from '../types'
 import { remapTerrainData } from '../utils/terrain'
+import { createBuilding } from '../utils/buildings'
+import { generateShadowHeatmapForDay, generateShadowHeatmapForYear } from '../utils/shadowAnalysis'
 
 const MAX_UNDO = 20
 
@@ -149,6 +151,7 @@ export const useStore = create<AppState>((set, get) => ({
     isDrawing: false,
     undoStack: [],
     redoStack: [],
+    brushColorType: 1 as TerrainColorType,
   } as TerrainEditorState,
 
   setTerrainEditor: (updates: Partial<TerrainEditorState>) =>
@@ -165,6 +168,7 @@ export const useStore = create<AppState>((set, get) => ({
       heights: new Float32Array(terrainData.heights),
       maxHeight: terrainData.maxHeight,
       waterMask: terrainData.waterMask ? new Uint8Array(terrainData.waterMask) : undefined,
+      colorData: terrainData.colorData ? new Float32Array(terrainData.colorData) : undefined,
     }
     set({
       terrainEditor: {
@@ -185,6 +189,7 @@ export const useStore = create<AppState>((set, get) => ({
       heights: new Float32Array(terrainData.heights),
       maxHeight: terrainData.maxHeight,
       waterMask: terrainData.waterMask ? new Uint8Array(terrainData.waterMask) : undefined,
+      colorData: terrainData.colorData ? new Float32Array(terrainData.colorData) : undefined,
     } : null
     set({
       terrainData: last,
@@ -207,6 +212,7 @@ export const useStore = create<AppState>((set, get) => ({
       heights: new Float32Array(terrainData.heights),
       maxHeight: terrainData.maxHeight,
       waterMask: terrainData.waterMask ? new Uint8Array(terrainData.waterMask) : undefined,
+      colorData: terrainData.colorData ? new Float32Array(terrainData.colorData) : undefined,
     } : null
     set({
       terrainData: next,
@@ -266,6 +272,88 @@ export const useStore = create<AppState>((set, get) => ({
     set({ shadowAnalysisReport: report }),
   isGeneratingReport: false,
   setIsGeneratingReport: (v: boolean) => set({ isGeneratingReport: v }),
+
+  // Shadow Heatmap
+  shadowHeatmap: {
+    enabled: false,
+    mode: 'day' as ShadowHeatmapMode,
+    isGenerating: false,
+    result: null,
+    opacity: 0.6,
+    gridResolution: 50,
+  },
+  
+  setShadowHeatmap: (updates: Partial<AppState['shadowHeatmap']>) =>
+    set(state => ({
+      shadowHeatmap: { ...state.shadowHeatmap, ...updates },
+    })),
+  
+  generateShadowHeatmap: (mode: ShadowHeatmapMode) => {
+    const { buildings, location, dateTime, canvasSize, shadowHeatmap } = get()
+    
+    if (buildings.length === 0) return
+    
+    set({ shadowHeatmap: { ...shadowHeatmap, isGenerating: true, mode } })
+    
+    setTimeout(() => {
+      try {
+        const gridPoints = mode === 'day'
+          ? generateShadowHeatmapForDay(
+              buildings, 
+              location, 
+              dateTime,
+              shadowHeatmap.gridResolution,
+              canvasSize
+            )
+          : generateShadowHeatmapForYear(
+              buildings, 
+              location, 
+              dateTime.getFullYear(),
+              shadowHeatmap.gridResolution,
+              canvasSize
+            )
+        
+        const maxShadowMinutes = Math.max(...gridPoints.map(p => p.shadowMinutes))
+        const minShadowMinutes = Math.min(...gridPoints.map(p => p.shadowMinutes))
+        
+        const result: ShadowHeatmapResult = {
+          mode,
+          gridSize: shadowHeatmap.gridResolution,
+          gridPoints,
+          maxShadowMinutes,
+          minShadowMinutes,
+          generatedAt: new Date(),
+        }
+        
+        set({
+          shadowHeatmap: {
+            ...get().shadowHeatmap,
+            isGenerating: false,
+            result,
+            enabled: true,
+          },
+        })
+      } catch (error) {
+        console.error('Failed to generate shadow heatmap:', error)
+        set({
+          shadowHeatmap: {
+            ...get().shadowHeatmap,
+            isGenerating: false,
+          },
+        })
+      }
+    }, 100)
+  },
+  
+  clearShadowHeatmap: () => {
+    set({
+      shadowHeatmap: {
+        ...get().shadowHeatmap,
+        enabled: false,
+        result: null,
+      },
+    })
+  },
 
   // Measurement Tool
   measurementTool: {
@@ -355,6 +443,155 @@ export const useStore = create<AppState>((set, get) => ({
       measurementTool: {
         ...state.measurementTool,
         results: [],
+      },
+    })),
+
+  roadEditor: {
+    enabled: false,
+    roadWidth: 12,
+    roadElevation: 8,
+    roadHeightMode: 'follow-terrain' as RoadHeightMode,
+    roadMode: 'curve' as RoadMode,
+    curveTension: 0.5,
+    previewPoints: [],
+    isDrawing: false,
+    laneConfig: {
+      laneCount: 2,
+      laneWidth: 3.5,
+      centerLineType: 'double-yellow',
+      laneDividerType: 'dashed',
+      edgeLineType: 'white-edge',
+      dashedLineLength: 4,
+      dashedLineGap: 6,
+      showLaneLines: true,
+    } as RoadLaneConfig,
+  } as RoadEditorState,
+
+  setRoadEditor: (updates: Partial<RoadEditorState>) =>
+    set(state => ({
+      roadEditor: { ...state.roadEditor, ...updates },
+    })),
+
+  addRoadPreviewPoint: (point: { x: number; z: number }) =>
+    set(state => ({
+      roadEditor: {
+        ...state.roadEditor,
+        previewPoints: [...state.roadEditor.previewPoints, point],
+      },
+    })),
+
+  completeRoad: () => {
+    const state = get()
+    const { roadEditor } = state
+    const { previewPoints, roadWidth, roadElevation, roadHeightMode, roadMode, curveTension, laneConfig } = roadEditor
+
+    if (previewPoints.length < 2) return
+
+    const firstPoint = previewPoints[0]
+    const roadBuilding = createBuilding('road', [firstPoint.x, firstPoint.z])
+
+    roadBuilding.roadMode = roadMode
+    roadBuilding.roadHeightMode = roadHeightMode
+    roadBuilding.roadElevation = roadElevation
+    roadBuilding.roadPathPoints = previewPoints.map(p => ({
+      x: p.x - firstPoint.x,
+      z: p.z - firstPoint.z,
+    }))
+    roadBuilding.roadCurveTension = curveTension
+    roadBuilding.roadLaneConfig = { ...laneConfig }
+    roadBuilding.params = {
+      width: roadWidth,
+      thickness: 0.15,
+      segments: 48,
+    }
+
+    set({
+      buildings: [...state.buildings, roadBuilding],
+      roadEditor: {
+        ...state.roadEditor,
+        previewPoints: [],
+        isDrawing: false,
+      },
+      dirty: true,
+    })
+  },
+
+  cancelRoadDrawing: () =>
+    set(state => ({
+      roadEditor: {
+        ...state.roadEditor,
+        enabled: false,
+        previewPoints: [],
+        isDrawing: false,
+      },
+    })),
+
+  // Annotation Tool
+  annotationTool: {
+    enabled: false,
+    mode: 'text' as AnnotationMode,
+    annotations: [],
+    selectedAnnotationId: null,
+    isDrawing: false,
+    currentPosition: null,
+    temporaryAnnotation: null,
+    color: '#1677ff' as AnnotationColor,
+    fontSize: 14,
+  } as AnnotationToolState,
+
+  setAnnotationTool: (updates: Partial<AnnotationToolState>) =>
+    set(state => ({
+      annotationTool: { ...state.annotationTool, ...updates },
+    })),
+
+  addAnnotation: (annotation: Annotation) =>
+    set(state => ({
+      annotationTool: {
+        ...state.annotationTool,
+        annotations: [...state.annotationTool.annotations, annotation],
+      },
+      dirty: true,
+    })),
+
+  updateAnnotation: (id: string, updates: Partial<Annotation>) =>
+    set(state => ({
+      annotationTool: {
+        ...state.annotationTool,
+        annotations: state.annotationTool.annotations.map(a =>
+          a.id === id ? { ...a, ...updates } : a
+        ),
+      },
+      dirty: true,
+    })),
+
+  removeAnnotation: (id: string) =>
+    set(state => ({
+      annotationTool: {
+        ...state.annotationTool,
+        annotations: state.annotationTool.annotations.filter(a => a.id !== id),
+        selectedAnnotationId:
+          state.annotationTool.selectedAnnotationId === id
+            ? null
+            : state.annotationTool.selectedAnnotationId,
+      },
+      dirty: true,
+    })),
+
+  clearAnnotations: () =>
+    set(state => ({
+      annotationTool: {
+        ...state.annotationTool,
+        annotations: [],
+        selectedAnnotationId: null,
+      },
+      dirty: true,
+    })),
+
+  selectAnnotation: (id: string | null) =>
+    set(state => ({
+      annotationTool: {
+        ...state.annotationTool,
+        selectedAnnotationId: id,
       },
     })),
 

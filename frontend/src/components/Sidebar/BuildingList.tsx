@@ -147,7 +147,7 @@ export function BuildingList({ editingId, onEdit }: Props) {
   const hasSelection = selectedBuildingIds.length > 0
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {hasSelection && (
         <div style={{
           padding: '8px 12px',

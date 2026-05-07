@@ -1,4 +1,14 @@
-import type { Building, Location, SolarTerm, ShadowAnalysisReport, SolarTermDaylightAnalysis, BuildingDaylightResult } from '../types'
+import type { 
+  Building, 
+  Location, 
+  SolarTerm, 
+  ShadowAnalysisReport, 
+  SolarTermDaylightAnalysis, 
+  BuildingDaylightResult,
+  ShadowHeatmapGridPoint, 
+  ShadowHeatmapMode, 
+  ShadowHeatmapResult 
+} from '../types'
 import { getSunData } from './sunCalc'
 import * as THREE from 'three'
 import { BUILDING_PRESETS } from './buildings'
@@ -92,11 +102,6 @@ function getBuildingBoundingBox(building: Building): THREE.Box3 {
       width = tRadius * 2
       depth = tRadius * 2
       height = (params.trunkHeight || 5) + (params.canopyHeight || 8)
-      break
-    case 'river':
-      width = params.length || 120
-      depth = params.width || 10
-      height = 0.1
       break
     case 'ai-circular':
       const aiRadius = params.radius || 15
@@ -356,4 +361,230 @@ export function formatTime(date: Date): string {
   const h = date.getHours().toString().padStart(2, '0')
   const m = date.getMinutes().toString().padStart(2, '0')
   return `${h}:${m}`
+}
+
+export function isPointInShadow(
+  pointX: number,
+  pointZ: number,
+  buildings: Building[],
+  sunAzimuth: number,
+  sunAltitude: number
+): boolean {
+  const sunDirectionX = Math.sin(sunAzimuth)
+  const sunDirectionZ = Math.cos(sunAzimuth)
+  
+  for (const building of buildings) {
+    const buildingBox = getBuildingBoundingBox(building)
+    const buildingCenter = new THREE.Vector3()
+    buildingBox.getCenter(buildingCenter)
+    
+    const toPoint = new THREE.Vector3(pointX - buildingCenter.x, 0, pointZ - buildingCenter.z)
+    const distance2D = toPoint.length()
+    
+    if (distance2D < 1) return true
+    
+    toPoint.normalize()
+    
+    const sunDirection = new THREE.Vector3(-sunDirectionX, 0, sunDirectionZ).normalize()
+    const dot = toPoint.dot(sunDirection)
+    
+    if (dot < 0.1) continue
+    
+    const buildingHeight = buildingBox.max.y - buildingBox.min.y
+    const shadowLength = buildingHeight / Math.tan(Math.max(sunAltitude, 0.1))
+    
+    if (distance2D > shadowLength * 1.2) continue
+    
+    const buildingHalfWidth = (buildingBox.max.x - buildingBox.min.x) / 2
+    const buildingHalfDepth = (buildingBox.max.z - buildingBox.min.z) / 2
+    
+    const perpendicularX = -sunDirection.z
+    const perpendicularZ = sunDirection.x
+    const pointPerpendicularDist = Math.abs(
+      (pointX - buildingCenter.x) * perpendicularX + 
+      (pointZ - buildingCenter.z) * perpendicularZ
+    )
+    
+    if (pointPerpendicularDist > Math.max(buildingHalfWidth, buildingHalfDepth) * 1.5) continue
+    
+    return true
+  }
+  
+  return false
+}
+
+export function generateShadowHeatmapForDay(
+  buildings: Building[],
+  location: Location,
+  date: Date,
+  gridResolution: number = 50,
+  canvasSize: number = 2000
+): ShadowHeatmapGridPoint[] {
+  const gridPoints: ShadowHeatmapGridPoint[] = []
+  const halfSize = canvasSize / 2
+  const step = canvasSize / gridResolution
+  
+  const sunData = getSunData(location.lat, location.lng, date)
+  const sunrise = sunData.sunrise
+  const sunset = sunData.sunset
+  
+  const year = date.getFullYear()
+  const month = date.getMonth()
+  const day = date.getDate()
+  
+  for (let i = 0; i < gridResolution; i++) {
+    for (let j = 0; j < gridResolution; j++) {
+      const x = -halfSize + i * step + step / 2
+      const z = -halfSize + j * step + step / 2
+      
+      let shadowMinutes = 0
+      let totalMinutes = 0
+      
+      for (let hour = sunrise.getHours(); hour <= sunset.getHours(); hour++) {
+        for (let minute = 0; minute < 60; minute += 15) {
+          const checkTime = new Date(year, month, day, hour, minute, 0)
+          
+          if (checkTime < sunrise || checkTime > sunset) continue
+          
+          const currentSunData = getSunData(location.lat, location.lng, checkTime)
+          if (currentSunData.altitude <= 0) continue
+          
+          totalMinutes += 15
+          
+          const inShadow = isPointInShadow(
+            x, z, buildings,
+            currentSunData.azimuth,
+            currentSunData.altitude
+          )
+          
+          if (inShadow) {
+            shadowMinutes += 15
+          }
+        }
+      }
+      
+      gridPoints.push({
+        x,
+        z,
+        shadowMinutes,
+        totalMinutes
+      })
+    }
+  }
+  
+  return gridPoints
+}
+
+export function generateShadowHeatmapForYear(
+  buildings: Building[],
+  location: Location,
+  year: number,
+  gridResolution: number = 50,
+  canvasSize: number = 2000
+): ShadowHeatmapGridPoint[] {
+  const gridPoints: ShadowHeatmapGridPoint[] = []
+  const halfSize = canvasSize / 2
+  const step = canvasSize / gridResolution
+  
+  const analysisDates: Date[] = []
+  
+  for (const term of SOLAR_TERMS) {
+    analysisDates.push(new Date(year, term.month - 1, term.day, 12, 0, 0))
+  }
+  
+  for (let i = 0; i < gridResolution; i++) {
+    for (let j = 0; j < gridResolution; j++) {
+      const x = -halfSize + i * step + step / 2
+      const z = -halfSize + j * step + step / 2
+      
+      let totalShadowMinutes = 0
+      let totalDaylightMinutes = 0
+      
+      for (const date of analysisDates) {
+        const sunData = getSunData(location.lat, location.lng, date)
+        const sunrise = sunData.sunrise
+        const sunset = sunData.sunset
+        
+        const yearVal = date.getFullYear()
+        const month = date.getMonth()
+        const day = date.getDate()
+        
+        for (let hour = sunrise.getHours(); hour <= sunset.getHours(); hour++) {
+          for (let minute = 0; minute < 60; minute += 30) {
+            const checkTime = new Date(yearVal, month, day, hour, minute, 0)
+            
+            if (checkTime < sunrise || checkTime > sunset) continue
+            
+            const currentSunData = getSunData(location.lat, location.lng, checkTime)
+            if (currentSunData.altitude <= 0) continue
+            
+            totalDaylightMinutes += 30
+            
+            const inShadow = isPointInShadow(
+              x, z, buildings,
+              currentSunData.azimuth,
+              currentSunData.altitude
+            )
+            
+            if (inShadow) {
+              totalShadowMinutes += 30
+            }
+          }
+        }
+      }
+      
+      gridPoints.push({
+        x,
+        z,
+        shadowMinutes: totalShadowMinutes,
+        totalMinutes: totalDaylightMinutes
+      })
+    }
+  }
+  
+  return gridPoints
+}
+
+export function getHeatmapColor(
+  shadowRatio: number,
+  maxShadowRatio: number = 1.0
+): [number, number, number] {
+  const normalizedRatio = Math.min(shadowRatio / maxShadowRatio, 1.0)
+  
+  if (normalizedRatio < 0.2) {
+    const t = normalizedRatio / 0.2
+    return [
+      0.0 + t * 0.0,
+      0.8 + t * 0.2,
+      0.0
+    ]
+  } else if (normalizedRatio < 0.4) {
+    const t = (normalizedRatio - 0.2) / 0.2
+    return [
+      0.0 + t * 1.0,
+      1.0 - t * 0.2,
+      0.0
+    ]
+  } else if (normalizedRatio < 0.6) {
+    const t = (normalizedRatio - 0.4) / 0.2
+    return [
+      1.0,
+      0.8 - t * 0.3,
+      0.0
+    ]
+  } else if (normalizedRatio < 0.8) {
+    const t = (normalizedRatio - 0.6) / 0.2
+    return [
+      1.0 - t * 0.3,
+      0.5 - t * 0.3,
+      0.0
+    ]
+  } else {
+    const t = (normalizedRatio - 0.8) / 0.2
+    return [
+      0.7 - t * 0.4,
+      0.2 - t * 0.1,
+      0.0 + t * 0.3
+    ]
+  }
 }

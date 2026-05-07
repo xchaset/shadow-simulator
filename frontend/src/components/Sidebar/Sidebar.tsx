@@ -5,7 +5,7 @@ import { Button } from 'antd'
 import { LeftOutlined, RightOutlined, UnorderedListOutlined, SettingOutlined, CloseOutlined } from '@ant-design/icons'
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
 
   if (collapsed) {
@@ -48,6 +48,7 @@ export function Sidebar() {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexShrink: 0,
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <UnorderedListOutlined /> 建筑列表
@@ -59,12 +60,20 @@ export function Sidebar() {
           onClick={() => setCollapsed(true)}
         />
       </div>
-      <BuildingList
-        editingId={editingId}
-        onEdit={(id) => setEditingId(editingId === id ? null : id)}
-      />
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <BuildingList
+          editingId={editingId}
+          onEdit={(id) => setEditingId(editingId === id ? null : id)}
+        />
+      </div>
       {editingId && (
-        <div style={{ borderTop: '1px solid #e8e8e8' }}>
+        <div style={{
+          borderTop: '1px solid #e8e8e8',
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '50%',
+        }}>
           <div style={{
             padding: '8px 12px',
             fontWeight: 600,
@@ -73,6 +82,7 @@ export function Sidebar() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexShrink: 0,
           }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <SettingOutlined /> 属性编辑
@@ -84,7 +94,7 @@ export function Sidebar() {
               onClick={() => setEditingId(null)}
             />
           </div>
-          <div style={{ overflow: 'auto', maxHeight: 400 }}>
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <BuildingEditor editingId={editingId} />
           </div>
         </div>

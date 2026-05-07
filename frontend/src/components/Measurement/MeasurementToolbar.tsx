@@ -89,6 +89,7 @@ export function MeasurementToolbar() {
         padding: '12px 16px',
         maxHeight: 400,
         overflowY: 'auto',
+        flexShrink: 0,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>

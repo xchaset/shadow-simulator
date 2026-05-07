@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import { Plane, Vector3 } from 'three'
 import { useStore } from '../../store/useStore'
+import type { TerrainColorType } from '../../types'
 
 interface TerrainEditorProps {
   geometryRef: React.RefObject<any>
@@ -11,6 +12,14 @@ interface TerrainEditorProps {
 const _hitVec = new Vector3()
 const _groundPlane = new Plane(new Vector3(0, 1, 0), 0)
 const _screenVec = new Vector3()
+
+const TERRAIN_COLORS: Record<TerrainColorType, [number, number, number]> = {
+  0: [139 / 255, 115 / 255, 85 / 255],
+  1: [34 / 255, 139 / 255, 34 / 255],
+  2: [245 / 255, 245 / 255, 245 / 255],
+  3: [105 / 255, 105 / 255, 105 / 255],
+  4: [144 / 255, 238 / 255, 144 / 255],
+}
 
 interface BrushStyleCache {
   display: string
@@ -34,8 +43,10 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
   const dirtyBoundsRef = useRef<[number, number, number, number]>([Infinity, Infinity, -Infinity, -Infinity])
   const heightsRef = useRef<Float32Array | null>(null)
   const waterMaskRef = useRef<Uint8Array | null>(null)
+  const colorDataRef = useRef<Float32Array | null>(null)
   const resolutionRef = useRef(128)
   const isWaterBrushRef = useRef(false)
+  const isColorBrushRef = useRef(false)
 
   const brushIndicatorRef = useRef<HTMLElement | null>(null)
   const lastStyleRef = useRef<BrushStyleCache>({
@@ -48,11 +59,19 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
   useEffect(() => {
     if (!useStore.getState().terrainData) {
+      const defaultColor = TERRAIN_COLORS[0]
+      const colorData = new Float32Array(128 * 128 * 3)
+      for (let i = 0; i < 128 * 128; i++) {
+        colorData[i * 3] = defaultColor[0]
+        colorData[i * 3 + 1] = defaultColor[1]
+        colorData[i * 3 + 2] = defaultColor[2]
+      }
       useStore.getState().setTerrainData({
         resolution: 128,
         heights: new Float32Array(128 * 128),
         maxHeight: 500,
         waterMask: new Uint8Array(128 * 128),
+        colorData,
       })
     }
   }, [])
@@ -93,6 +112,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
     const geometry = geometryRef.current
     const heights = heightsRef.current
     const waterMask = waterMaskRef.current
+    const colorData = colorDataRef.current
     if (!geometry) return
 
     const [minX, minY, maxX, maxY] = dirtyBoundsRef.current
@@ -130,6 +150,28 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       maskAttr.needsUpdate = true
     }
 
+    if (colorData && geometry.getAttribute('aTerrainColor')) {
+      const colorAttr = geometry.getAttribute('aTerrainColor') as any
+      const x0 = Math.max(0, Math.floor(minX))
+      const y0 = Math.max(0, Math.floor(minY))
+      const x1 = Math.min(res - 1, Math.ceil(maxX))
+      const y1 = Math.min(res - 1, Math.ceil(maxY))
+
+      for (let iy = y0; iy <= y1; iy++) {
+        for (let ix = x0; ix <= x1; ix++) {
+          const idx = iy * res + ix
+          const colorIdx = idx * 3
+          colorAttr.setXYZ(
+            idx,
+            colorData[colorIdx],
+            colorData[colorIdx + 1],
+            colorData[colorIdx + 2]
+          )
+        }
+      }
+      colorAttr.needsUpdate = true
+    }
+
     dirtyBoundsRef.current = [Infinity, Infinity, -Infinity, -Infinity]
   }, [geometryRef])
 
@@ -144,11 +186,19 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
   const applyBrush = useCallback((worldX: number, worldZ: number, isFirst: boolean) => {
     let data = useStore.getState().terrainData
     if (!data || !data.heights || data.heights.length === 0) {
+      const defaultColor = TERRAIN_COLORS[0]
+      const colorData = new Float32Array(128 * 128 * 3)
+      for (let i = 0; i < 128 * 128; i++) {
+        colorData[i * 3] = defaultColor[0]
+        colorData[i * 3 + 1] = defaultColor[1]
+        colorData[i * 3 + 2] = defaultColor[2]
+      }
       const newData = {
         resolution: 128,
         heights: new Float32Array(128 * 128),
         maxHeight: 500,
         waterMask: new Uint8Array(128 * 128),
+        colorData,
       }
       console.log('[TerrainEditor] 初始化地形数据:', newData)
       useStore.getState().setTerrainData(newData)
@@ -159,22 +209,38 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
       data.waterMask = new Uint8Array(data.resolution * data.resolution)
     }
 
-    const { brushMode, brushRadius, brushStrength, brushMaxHeight } = useStore.getState().terrainEditor
+    if (!data.colorData) {
+      const defaultColor = TERRAIN_COLORS[0]
+      const colorData = new Float32Array(data.resolution * data.resolution * 3)
+      for (let i = 0; i < data.resolution * data.resolution; i++) {
+        colorData[i * 3] = defaultColor[0]
+        colorData[i * 3 + 1] = defaultColor[1]
+        colorData[i * 3 + 2] = defaultColor[2]
+      }
+      data.colorData = colorData
+    }
+
+    const { brushMode, brushRadius, brushStrength, brushMaxHeight, brushColorType } = useStore.getState().terrainEditor
     const [cx, cy] = worldToIndex(worldX, worldZ)
     const radiusInIndices = Math.ceil((brushRadius / canvasSize) * 128)
     const isWaterBrush = brushMode === 'water'
+    const isColorBrush = brushMode === 'color'
+    const targetColor = TERRAIN_COLORS[brushColorType] || TERRAIN_COLORS[0]
 
     if (isFirst) {
       console.log('[TerrainEditor] 开始绘制，模式:', brushMode, '位置:', [cx, cy], '半径:', radiusInIndices)
       useStore.getState().pushTerrainUndo()
       heightsRef.current = data.heights as Float32Array
       waterMaskRef.current = data.waterMask as Uint8Array
+      colorDataRef.current = data.colorData as Float32Array
       resolutionRef.current = data.resolution
       isWaterBrushRef.current = isWaterBrush
+      isColorBrushRef.current = isColorBrush
     }
 
     const heights = heightsRef.current || data.heights as Float32Array
     const waterMask = waterMaskRef.current || data.waterMask as Uint8Array
+    const colorData = colorDataRef.current || data.colorData as Float32Array
     const resolution = resolutionRef.current || data.resolution
 
     for (let dy = -radiusInIndices; dy <= radiusInIndices; dy++) {
@@ -192,6 +258,18 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
         if (isWaterBrush) {
           if (falloff > 0.3) {
             waterMask[idx] = 1
+          }
+        } else if (isColorBrush) {
+          if (falloff > 0.05) {
+            const colorIdx = idx * 3
+            const currentR = colorData[colorIdx]
+            const currentG = colorData[colorIdx + 1]
+            const currentB = colorData[colorIdx + 2]
+            
+            const blendFactor = Math.min(1, falloff * 1.5)
+            colorData[colorIdx] = currentR + (targetColor[0] - currentR) * blendFactor
+            colorData[colorIdx + 1] = currentG + (targetColor[1] - currentG) * blendFactor
+            colorData[colorIdx + 2] = currentB + (targetColor[2] - currentB) * blendFactor
           }
         } else {
           const currentHeight = heights[idx]
@@ -258,6 +336,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
         heightsLength: data.heights?.length,
         brushMaxHeight,
         hasWaterMask: !!data.waterMask,
+        hasColorData: !!data.colorData,
       })
 
       useStore.getState().setTerrainData({
@@ -265,6 +344,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
         heights: data.heights,
         maxHeight: brushMaxHeight,
         waterMask: data.waterMask,
+        colorData: data.colorData,
       })
 
       const state = useStore.getState()
@@ -274,6 +354,7 @@ export function TerrainEditor({ geometryRef, onHeightChange }: TerrainEditorProp
 
     heightsRef.current = null
     waterMaskRef.current = null
+    colorDataRef.current = null
     onHeightChange()
     console.log('[TerrainEditor] finishDrawing 结束')
   }, [flushGeometry, geometryRef, onHeightChange])

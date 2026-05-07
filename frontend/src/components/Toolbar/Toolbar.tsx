@@ -7,24 +7,30 @@ import { SunInfoPanel } from '../SunInfo/SunInfoPanel'
 import { TemplateSelector } from './TemplateSelector'
 import { CustomTemplateBar } from './CustomTemplateBar'
 import { ShareModal } from '../Share/ShareModal'
+import { FullscreenButton } from '../Controls/FullscreenButton'
 import { Button } from 'antd'
 import { 
   AimOutlined, AppstoreOutlined, EnvironmentOutlined, FileTextOutlined, 
-  BorderOutlined, ShareAltOutlined 
+  BorderOutlined, ShareAltOutlined, LineChartOutlined, HeatMapOutlined,
+  FontSizeOutlined
 } from '@ant-design/icons'
 import { useStore } from '../../store/useStore'
 
 interface ToolbarProps {
   onOpenMap?: () => void
   onOpenShadowAnalysis?: () => void
+  onOpenShadowHeatmap?: () => void
 }
 
-export function Toolbar({ onOpenMap, onOpenShadowAnalysis }: ToolbarProps) {
+export function Toolbar({ onOpenMap, onOpenShadowAnalysis, onOpenShadowHeatmap }: ToolbarProps) {
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const terrainEditor = useStore(s => s.terrainEditor)
   const setTerrainEditor = useStore(s => s.setTerrainEditor)
   const measurementTool = useStore(s => s.measurementTool)
   const setMeasurementTool = useStore(s => s.setMeasurementTool)
+  const roadEditor = useStore(s => s.roadEditor)
+  const setRoadEditor = useStore(s => s.setRoadEditor)
+  const cancelRoadDrawing = useStore(s => s.cancelRoadDrawing)
   const clearMeasurementPoints = useStore(s => s.clearMeasurementPoints)
   const selectedBuildingIds = useStore(s => s.selectedBuildingIds)
   const selectedBuildingId = useStore(s => s.selectedBuildingId)
@@ -43,6 +49,30 @@ export function Toolbar({ onOpenMap, onOpenShadowAnalysis }: ToolbarProps) {
       setMeasurementTool({ enabled: false })
     } else {
       setMeasurementTool({ enabled: true })
+    }
+  }
+
+  const toggleRoad = () => {
+    if (roadEditor.enabled) {
+      cancelRoadDrawing()
+    } else {
+      setRoadEditor({ enabled: true, previewPoints: [], isDrawing: false })
+    }
+  }
+
+  const annotationTool = useStore(s => s.annotationTool)
+  const setAnnotationTool = useStore(s => s.setAnnotationTool)
+
+  const toggleAnnotation = () => {
+    if (annotationTool.enabled) {
+      setAnnotationTool({ 
+        enabled: false, 
+        isDrawing: false, 
+        currentPosition: null, 
+        temporaryAnnotation: null 
+      })
+    } else {
+      setAnnotationTool({ enabled: true })
     }
   }
 
@@ -128,6 +158,24 @@ export function Toolbar({ onOpenMap, onOpenShadowAnalysis }: ToolbarProps) {
             >
               测量
             </Button>
+            <Button
+              size="small"
+              type={roadEditor.enabled ? 'primary' : 'default'}
+              icon={<LineChartOutlined />}
+              onClick={toggleRoad}
+              style={{ flexShrink: 0 }}
+            >
+              道路
+            </Button>
+            <Button
+              size="small"
+              type={annotationTool.enabled ? 'primary' : 'default'}
+              icon={<FontSizeOutlined />}
+              onClick={toggleAnnotation}
+              style={{ flexShrink: 0 }}
+            >
+              标注
+            </Button>
             {onOpenShadowAnalysis && (
               <Button
                 size="small"
@@ -137,6 +185,16 @@ export function Toolbar({ onOpenMap, onOpenShadowAnalysis }: ToolbarProps) {
                 style={{ flexShrink: 0 }}
               >
                 阴影分析
+              </Button>
+            )}
+            {onOpenShadowHeatmap && (
+              <Button
+                size="small"
+                icon={<HeatMapOutlined />}
+                onClick={onOpenShadowHeatmap}
+                style={{ flexShrink: 0 }}
+              >
+                阴影热力图
               </Button>
             )}
           </>
@@ -152,6 +210,7 @@ export function Toolbar({ onOpenMap, onOpenShadowAnalysis }: ToolbarProps) {
             分享
           </Button>
         )}
+        <FullscreenButton />
         <div style={{ flexShrink: 0 }}>
           <SunInfoPanel />
         </div>

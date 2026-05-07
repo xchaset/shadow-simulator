@@ -104,6 +104,7 @@ export function GlbBuildingMesh({ building }: Props) {
         rotation={[0, (building.rotation * Math.PI) / 180, 0]}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        userData={{ buildingId: building.id }}
       >
         <mesh position={[0, 5, 0]} castShadow receiveShadow>
           <boxGeometry args={[10, 10, 10]} />
@@ -126,6 +127,7 @@ export function GlbBuildingMesh({ building }: Props) {
       scale={[scale, scale, scale]}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      userData={{ buildingId: building.id }}
     >
       <primitive object={scene} />
       {isSelectedVisual && outlineData.map((item, i) => (

@@ -20,6 +20,20 @@ export function FloatingEditor() {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const renameInputRef = useRef<any>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!editorOpen) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
+        setEditorOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [editorOpen, setEditorOpen])
 
   // 自动聚焦重命名输入框
   useEffect(() => {
@@ -87,12 +101,13 @@ export function FloatingEditor() {
 
   return (
     <div
+      ref={editorRef}
       style={{
         position: 'absolute',
         top: 12,
         left: 12,
         zIndex: 100,
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'rgba(255, 255, 255, 0.7)',
         backdropFilter: 'blur(8px)',
         borderRadius: 10,
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',

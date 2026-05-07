@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Tooltip, Slider, Modal, Switch } from 'antd'
-import { SettingOutlined, BorderOutlined, BorderlessTableOutlined } from '@ant-design/icons'
+import { SettingOutlined, BorderOutlined, BorderlessTableOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { useStore } from '../../store/useStore'
 
 export function CanvasSettings() {
@@ -62,7 +62,12 @@ export function CanvasSettings() {
         width={400}
       >
         <div style={{ marginBottom: 24 }}>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>画布尺寸: {canvasSize}</div>
+          <div style={{ marginBottom: 8, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+            画布尺寸: {canvasSize}
+            <Tooltip title="调整画布大小以容纳更多建筑物" placement="top">
+              <QuestionCircleOutlined style={{ fontSize: 14, color: '#999', cursor: 'help' }} />
+            </Tooltip>
+          </div>
           <Slider
             min={500}
             max={5000}
@@ -76,9 +81,6 @@ export function CanvasSettings() {
               5000: '5000',
             }}
           />
-          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-            调整画布大小以容纳更多建筑物
-          </div>
         </div>
 
         <div style={{ marginBottom: 24 }}>
@@ -88,7 +90,12 @@ export function CanvasSettings() {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>网格密度: {gridDivisions}</div>
+          <div style={{ marginBottom: 8, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+            网格密度: {gridDivisions}
+            <Tooltip title={`网格线数量（每格大小: ${Math.round(canvasSize / gridDivisions)} 单位）`} placement="top">
+              <QuestionCircleOutlined style={{ fontSize: 14, color: '#999', cursor: 'help' }} />
+            </Tooltip>
+          </div>
           <Slider
             min={20}
             max={500}
@@ -102,9 +109,6 @@ export function CanvasSettings() {
               500: '500',
             }}
           />
-          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-            网格线数量（每格大小: {Math.round(canvasSize / gridDivisions)} 单位）
-          </div>
         </div>
       </Modal>
     </>

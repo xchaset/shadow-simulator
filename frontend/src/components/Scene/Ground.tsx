@@ -1,6 +1,5 @@
 import { useRef, useEffect, useMemo, useCallback } from 'react'
 import { useStore } from '../../store/useStore'
-import type { TerrainData } from '../../types'
 import * as THREE from 'three'
 
 interface GroundProps {
@@ -9,6 +8,8 @@ interface GroundProps {
 }
 
 const TERRAIN_RESOLUTION = 128
+
+const DEFAULT_TERRAIN_COLOR: [number, number, number] = [139 / 255, 115 / 255, 85 / 255]
 
 export function Ground({ onClick, terrainRef }: GroundProps) {
   const canvasSize = useStore(s => s.canvasSize)
@@ -31,7 +32,7 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
 
   const terrainMaterial = useMemo(() => {
     const material = new THREE.MeshStandardMaterial({
-      color: '#8B7355',
+      color: new THREE.Color(DEFAULT_TERRAIN_COLOR[0], DEFAULT_TERRAIN_COLOR[1], DEFAULT_TERRAIN_COLOR[2]),
     })
 
     material.onBeforeCompile = (shader) => {
@@ -39,24 +40,28 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
 
       shader.vertexShader = `
         attribute float aWaterMask;
+        attribute vec3 aTerrainColor;
         varying float vWaterMask;
+        varying vec3 vTerrainColor;
       ` + shader.vertexShader
 
       shader.vertexShader = shader.vertexShader.replace(
         '#include <uv_vertex>',
         `#include <uv_vertex>
-        vWaterMask = aWaterMask;`
+        vWaterMask = aWaterMask;
+        vTerrainColor = aTerrainColor;`
       )
 
       shader.fragmentShader = `
         uniform vec3 uWaterColor;
         varying float vWaterMask;
+        varying vec3 vTerrainColor;
       ` + shader.fragmentShader
 
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-        diffuseColor.rgb = mix(diffuseColor.rgb, uWaterColor, vWaterMask);`
+        diffuseColor.rgb = mix(vTerrainColor, uWaterColor, vWaterMask);`
       )
     }
 
@@ -86,6 +91,39 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
     }
   }, [])
 
+  const updateColorDataAttribute = useCallback((geometry: THREE.BufferGeometry, colorData: Float32Array | number[] | undefined) => {
+    if (!geometry) return
+
+    let colorAttr = geometry.getAttribute('aTerrainColor') as THREE.BufferAttribute | undefined
+    const vertexCount = TERRAIN_RESOLUTION * TERRAIN_RESOLUTION
+
+    if (!colorAttr) {
+      const colorBuffer = new Float32Array(vertexCount * 3)
+      if (colorData) {
+        for (let i = 0; i < vertexCount && i * 3 < colorData.length; i++) {
+          colorBuffer[i * 3] = colorData[i * 3]
+          colorBuffer[i * 3 + 1] = colorData[i * 3 + 1]
+          colorBuffer[i * 3 + 2] = colorData[i * 3 + 2]
+        }
+      } else {
+        for (let i = 0; i < vertexCount; i++) {
+          colorBuffer[i * 3] = DEFAULT_TERRAIN_COLOR[0]
+          colorBuffer[i * 3 + 1] = DEFAULT_TERRAIN_COLOR[1]
+          colorBuffer[i * 3 + 2] = DEFAULT_TERRAIN_COLOR[2]
+        }
+      }
+      geometry.setAttribute('aTerrainColor', new THREE.BufferAttribute(colorBuffer, 3))
+    } else if (colorData) {
+      const colorBuffer = colorAttr.array as Float32Array
+      for (let i = 0; i < vertexCount && i * 3 < colorData.length; i++) {
+        colorBuffer[i * 3] = colorData[i * 3]
+        colorBuffer[i * 3 + 1] = colorData[i * 3 + 1]
+        colorBuffer[i * 3 + 2] = colorData[i * 3 + 2]
+      }
+      colorAttr.needsUpdate = true
+    }
+  }, [])
+
   useEffect(() => {
     if (!terrainData || !hasTerrain) return
     if (terrainEditor.isDrawing) return
@@ -94,7 +132,7 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
 
     const geometry = mesh.geometry
     const pos = geometry.attributes.position
-    const { heights, resolution, waterMask } = terrainData
+    const { heights, resolution, waterMask, colorData } = terrainData
 
     for (let i = 0; i < resolution; i++) {
       for (let j = 0; j < resolution; j++) {
@@ -105,7 +143,8 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
     geometry.computeVertexNormals()
 
     updateWaterMaskAttribute(geometry, waterMask)
-  }, [terrainData, hasTerrain, terrainEditor.isDrawing, updateWaterMaskAttribute, canvasSize])
+    updateColorDataAttribute(geometry, colorData)
+  }, [terrainData, hasTerrain, terrainEditor.isDrawing, updateWaterMaskAttribute, updateColorDataAttribute, canvasSize])
 
   useEffect(() => {
     const mesh = meshRef.current
@@ -118,6 +157,18 @@ export function Ground({ onClick, terrainRef }: GroundProps) {
       updateWaterMaskAttribute(geometry, undefined)
     }
   }, [updateWaterMaskAttribute])
+
+  useEffect(() => {
+    const mesh = meshRef.current
+    if (!mesh) return
+
+    const geometry = mesh.geometry
+    if (terrainData && terrainData.colorData) {
+      updateColorDataAttribute(geometry, terrainData.colorData)
+    } else {
+      updateColorDataAttribute(geometry, undefined)
+    }
+  }, [updateColorDataAttribute])
 
   return (
     <group>

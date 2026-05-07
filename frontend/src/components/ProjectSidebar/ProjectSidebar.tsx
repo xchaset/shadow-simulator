@@ -33,6 +33,8 @@ import {
 import type { Directory, Model } from '../../types'
 import { TerrainToolbar } from '../Terrain/TerrainToolbar'
 import { MeasurementToolbar } from '../Measurement'
+import { RoadToolbar } from '../Road/RoadToolbar'
+import { AnnotationToolbar } from '../Annotation'
 
 export function ProjectSidebar() {
   const {
@@ -44,6 +46,8 @@ export function ProjectSidebar() {
     setCanvasSize, setShowGrid, setGridDivisions, setTerrainData,
     terrainEditor, setTerrainEditor,
     measurementTool,
+    roadEditor,
+    annotationTool,
     lake, setLake,
   } = useStore()
 
@@ -482,6 +486,7 @@ export function ProjectSidebar() {
           prev.length === 1 && prev[0] === modelId ? [] : [modelId]
         )
       }
+      handleSelectModel(modelId)
     }
   }
 
@@ -1260,6 +1265,16 @@ export function ProjectSidebar() {
       {/* 测量工具栏 - 显示在左侧边栏内 */}
       {measurementTool.enabled && (
         <MeasurementToolbar />
+      )}
+
+      {/* 道路绘制工具栏 - 显示在左侧边栏内 */}
+      {roadEditor.enabled && (
+        <RoadToolbar />
+      )}
+
+      {/* 标注工具栏 - 显示在左侧边栏内 */}
+      {annotationTool.enabled && (
+        <AnnotationToolbar />
       )}
 
       {/* Move Modal */}

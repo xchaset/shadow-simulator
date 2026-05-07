@@ -14,12 +14,49 @@ export type BuildingType =
   | 'tree'
   | 'ai-circular'
   | 'ai-complex'
-  | 'river'
   | 'glb'
   | 'girder-bridge'
   | 'arch-bridge'
   | 'suspension-bridge'
   | 'cable-stayed-bridge'
+  | 'basketball-court'
+  | 'football-field'
+  | 'tennis-court'
+  | 'gymnasium'
+  // ─── 车辆类型 ──────────────────────────────────────────────
+  | 'car'
+  | 'suv'
+  | 'van'
+  | 'truck'
+  | 'bus'
+  | 'city-bus'
+  | 'train'
+  // ─── 船舶类型 ──────────────────────────────────────────────
+  | 'cargo-ship'
+  | 'container-ship'
+  | 'cruise-ship'
+  | 'pleasure-boat'
+  // ─── 交通设施类型 ──────────────────────────────────────────────
+  | 'traffic-light'
+  | 'street-sign'
+  | 'street-lamp'
+
+export type RoadMode = 'straight' | 'curve' | 'freehand'
+
+export type RoadHeightMode = 'follow-terrain' | 'elevated'
+
+export type LaneLineType = 'solid' | 'dashed' | 'double-yellow' | 'white-edge'
+
+export interface RoadLaneConfig {
+  laneCount: number
+  laneWidth: number
+  centerLineType: LaneLineType
+  laneDividerType: LaneLineType
+  edgeLineType: LaneLineType
+  dashedLineLength: number
+  dashedLineGap: number
+  showLaneLines: boolean
+}
 
 export interface Building {
   id: string
@@ -30,8 +67,14 @@ export interface Building {
   rotation: number
   color: string
   baseHeight?: number
-  glbUrl?: string  // GLB 模型文件 URL（仅 type='glb' 时使用）
-  glbScale?: number  // GLB 模型缩放比例（默认 1）
+  glbUrl?: string
+  glbScale?: number
+  roadMode?: RoadMode
+  roadHeightMode?: RoadHeightMode
+  roadElevation?: number
+  roadPathPoints?: Array<{ x: number; z: number }>
+  roadCurveTension?: number
+  roadLaneConfig?: RoadLaneConfig
 }
 
 export interface Location {
@@ -55,7 +98,7 @@ export interface PlaybackState {
 
 // ─── Terrain Types ────────────────────────────────────────
 
-export type TerrainBrushMode = 'raise' | 'lower' | 'smooth' | 'flatten' | 'water'
+export type TerrainBrushMode = 'raise' | 'lower' | 'smooth' | 'flatten' | 'water' | 'color'
 
 export interface TerrainData {
   /** 高度图分辨率（如 64, 128, 256） */
@@ -66,7 +109,11 @@ export interface TerrainData {
   maxHeight: number
   /** 水标记，0=不是水，1=是水（笔刷绘制的湖泊区域） */
   waterMask?: Uint8Array | number[]
+  /** 颜色数据，存储每个顶点的 RGB 颜色值，格式：[r, g, b, r, g, b, ...]，每个通道值范围 0-1 */
+  colorData?: Float32Array | number[]
 }
+
+export type TerrainColorType = 0 | 1 | 2 | 3 | 4
 
 export interface TerrainEditorState {
   /** 是否处于地形编辑模式 */
@@ -87,6 +134,8 @@ export interface TerrainEditorState {
   undoStack: TerrainData[]
   /** 重做栈 */
   redoStack: TerrainData[]
+  /** 当前选择的地貌颜色类型 (0=默认, 1=森林, 2=雪山, 3=岩石, 4=草地) */
+  brushColorType: TerrainColorType
 }
 
 // ─── Lake Types ────────────────────────────────────────────
@@ -179,6 +228,53 @@ export interface MeasurementToolState {
   points: MeasurementPoint[]
   results: MeasurementResult[]
   isDrawing: boolean
+}
+
+// ─── Annotation Types ─────────────────────────────────────
+
+export type AnnotationMode = 'text' | 'dimension' | 'arrow'
+
+export type AnnotationColor = '#1677ff' | '#52c41a' | '#fa8c16' | '#ff4d4f' | '#722ed1' | '#13c2c2'
+
+export interface Annotation {
+  id: string
+  mode: AnnotationMode
+  position: [x: number, z: number]
+  yOffset: number
+  rotation: number
+  scale: number
+  color: AnnotationColor
+  text?: string
+  fontSize?: number
+  dimensionStart?: [x: number, z: number]
+  dimensionEnd?: [x: number, z: number]
+  arrowDirection?: number
+  arrowLength?: number
+  createdAt: Date
+}
+
+export interface AnnotationToolState {
+  enabled: boolean
+  mode: AnnotationMode
+  annotations: Annotation[]
+  selectedAnnotationId: string | null
+  isDrawing: boolean
+  currentPosition: [number, number] | null
+  temporaryAnnotation: Partial<Annotation> | null
+  color: AnnotationColor
+  fontSize: number
+}
+
+export interface RoadEditorState {
+  enabled: boolean
+  roadWidth: number
+  roadElevation: number
+  roadHeightMode: RoadHeightMode
+  roadMode: RoadMode
+  curveTension: number
+  previewPoints: Array<{ x: number; z: number }>
+  isDrawing: boolean
+  laneConfig: RoadLaneConfig
 }
 
 // ─── App State ────────────────────────────────────────────
@@ -309,6 +405,33 @@ export interface CustomTemplateState {
   refreshTrigger: number
 }
 
+export type ShadowHeatmapMode = 'day' | 'year'
+
+export interface ShadowHeatmapGridPoint {
+  x: number
+  z: number
+  shadowMinutes: number
+  totalMinutes: number
+}
+
+export interface ShadowHeatmapResult {
+  mode: ShadowHeatmapMode
+  gridSize: number
+  gridPoints: ShadowHeatmapGridPoint[]
+  maxShadowMinutes: number
+  minShadowMinutes: number
+  generatedAt: Date
+}
+
+export interface ShadowHeatmapState {
+  enabled: boolean
+  mode: ShadowHeatmapMode
+  isGenerating: boolean
+  result: ShadowHeatmapResult | null
+  opacity: number
+  gridResolution: number
+}
+
 export interface AppState {
   // Scene
   location: Location
@@ -386,6 +509,12 @@ export interface AppState {
   isGeneratingReport: boolean
   setIsGeneratingReport: (v: boolean) => void
 
+  // Shadow Heatmap
+  shadowHeatmap: ShadowHeatmapState
+  setShadowHeatmap: (updates: Partial<ShadowHeatmapState>) => void
+  generateShadowHeatmap: (mode: ShadowHeatmapMode) => void
+  clearShadowHeatmap: () => void
+
   // Measurement Tool
   measurementTool: MeasurementToolState
   setMeasurementTool: (updates: Partial<MeasurementToolState>) => void
@@ -394,6 +523,22 @@ export interface AppState {
   clearMeasurementPoints: () => void
   completeMeasurement: () => void
   clearMeasurementResults: () => void
+
+  // Road Editor
+  roadEditor: RoadEditorState
+  setRoadEditor: (updates: Partial<RoadEditorState>) => void
+  addRoadPreviewPoint: (point: { x: number; z: number }) => void
+  completeRoad: () => void
+  cancelRoadDrawing: () => void
+
+  // Annotation Tool
+  annotationTool: AnnotationToolState
+  setAnnotationTool: (updates: Partial<AnnotationToolState>) => void
+  addAnnotation: (annotation: Annotation) => void
+  updateAnnotation: (id: string, updates: Partial<Annotation>) => void
+  removeAnnotation: (id: string) => void
+  clearAnnotations: () => void
+  selectAnnotation: (id: string | null) => void
 
   // Share Mode
   shareMode: ShareModeState

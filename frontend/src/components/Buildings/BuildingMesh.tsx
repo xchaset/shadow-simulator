@@ -54,6 +54,7 @@ export function BuildingMesh({ building }: Props) {
       rotation={[0, (building.rotation * Math.PI) / 180, 0]}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      userData={{ buildingId: building.id }}
     >
       {geometries.map((item, i) => (
         <mesh
@@ -69,8 +70,8 @@ export function BuildingMesh({ building }: Props) {
                 ? (building.params as any).roofColor || building.color
                 : item.color ?? building.color
             }
-            transparent={isSelectedVisual}
-            opacity={isSelectedVisual ? 0.85 : 1}
+            transparent={isSelectedVisual || item.opacity !== undefined}
+            opacity={item.opacity ?? (isSelectedVisual ? 0.85 : 1)}
             roughness={1}
             metalness={0}
           />

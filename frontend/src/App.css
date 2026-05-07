@@ -55,3 +55,47 @@ html, body, #root {
 ::-webkit-scrollbar-thumb:hover {
   background: #bfbfbf;
 }
+
+.app:fullscreen,
+.app:-webkit-full-screen,
+.app:-moz-full-screen,
+.app:-ms-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.app:fullscreen .main-content,
+.app:-webkit-full-screen .main-content,
+.app:-moz-full-screen .main-content,
+.app:-ms-fullscreen .main-content {
+  background: #000;
+}
+
+.app:fullscreen .ant-modal-wrap,
+.app:-webkit-full-screen .ant-modal-wrap,
+.app:-moz-full-screen .ant-modal-wrap,
+.app:-ms-fullscreen .ant-modal-wrap {
+  z-index: 2000;
+}
+
+.fullscreen-indicator {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 9999;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+:fullscreen .fullscreen-indicator,
+:-webkit-full-screen .fullscreen-indicator,
+:-moz-full-screen .fullscreen-indicator,
+:-ms-fullscreen .fullscreen-indicator {
+  display: block;
+}

@@ -11,9 +11,14 @@ import { FloatingEditor } from './FloatingEditor'
 import { BuildingGroup } from '../Buildings/BuildingGroup'
 import { SelectionBox } from '../Selection/SelectionBox'
 import { BoxSelectInteraction } from '../Selection/BoxSelectInteraction'
+import { BuildingDragInteraction } from '../Selection/BuildingDragInteraction'
 import { CanvasSettings } from './CanvasSettings'
 import { TerrainEditor } from '../Terrain/TerrainEditor'
 import { MeasurementInteraction, MeasurementOverlay } from '../Measurement'
+import { RoadInteraction } from '../Road/RoadInteraction'
+import { RoadPreview } from '../Road/RoadPreview'
+import { AnnotationInteraction, AnnotationOverlay } from '../Annotation'
+import { ShadowHeatmap } from './ShadowHeatmap'
 import { useSunPosition } from '../../hooks/useSunPosition'
 import { useStore } from '../../store/useStore'
 import { modelApi, recentModelApi } from '../../utils/api'
@@ -87,6 +92,8 @@ export function SceneCanvas() {
   const boxSelectEnd = useStore(s => s.boxSelectEnd)
   const terrainEditor = useStore(s => s.terrainEditor)
   const measurementTool = useStore(s => s.measurementTool)
+  const roadEditor = useStore(s => s.roadEditor)
+  const annotationTool = useStore(s => s.annotationTool)
   const setTerrainData = useStore(s => s.setTerrainData)
   const containerRef = useRef<HTMLDivElement>(null)
   const clipboardRef = useRef<ClipboardBuilding[] | null>(null)
@@ -333,15 +340,21 @@ export function SceneCanvas() {
         <SkyBackground />
         <SunLight />
         <Ground
-          onClick={isReadOnly ? undefined : (terrainEditor.enabled || measurementTool.enabled ? undefined : () => clearSelection())}
+          onClick={isReadOnly ? undefined : (terrainEditor.enabled || measurementTool.enabled || roadEditor.enabled || annotationTool.enabled ? undefined : () => clearSelection())}
           terrainRef={terrainRef}
         />
+        <ShadowHeatmap />
         <WaterSurface />
         <BuildingGroup />
+        <RoadPreview />
         {!isReadOnly && <SelectionBox start={boxSelectStart} end={boxSelectEnd} />}
         {!isReadOnly && <BoxSelectInteraction />}
+        {!isReadOnly && <BuildingDragInteraction />}
         {!isReadOnly && <MeasurementInteraction />}
         {!isReadOnly && <MeasurementOverlay />}
+        {!isReadOnly && <RoadInteraction />}
+        {!isReadOnly && <AnnotationInteraction />}
+        {!isReadOnly && <AnnotationOverlay />}
         <Compass />
         <SunIndicator />
         <CameraControls />

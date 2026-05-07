@@ -374,3 +374,78 @@ export const customTemplateApi = {
       method: 'DELETE',
     }),
 }
+
+// ─── Map API (Search and Geocoding) ───────────────────────────────
+
+export interface MapSearchItem {
+  name: string
+  district: string
+  location: [number, number]
+  address?: string
+  type?: string
+}
+
+export interface MapSearchResult {
+  success: boolean
+  count: string
+  items: MapSearchItem[]
+  suggestion?: {
+    keywords?: string[]
+    cities?: string[]
+  }
+}
+
+export interface MapGeocodeResult {
+  success: boolean
+  formatted_address: string
+  location: [number, number]
+  province: string
+  city: string
+  district: string
+}
+
+export interface MapRegeocodeResult {
+  success: boolean
+  formatted_address: string
+  addressComponent: {
+    province: string
+    city: string
+    district: string
+    township: string
+    street: string
+    streetNumber: string
+  }
+}
+
+export const mapApi = {
+  search: async (keyword: string, city?: string, page = 1, offset = 10): Promise<MapSearchResult> => {
+    const params = new URLSearchParams({
+      keyword: keyword.trim(),
+      page: String(page),
+      offset: String(offset),
+    })
+    if (city) {
+      params.append('city', city)
+    }
+    return request<MapSearchResult>(`/map/search?${params.toString()}`)
+  },
+
+  geocode: async (address: string, city?: string): Promise<MapGeocodeResult> => {
+    const params = new URLSearchParams({
+      address: address.trim(),
+    })
+    if (city) {
+      params.append('city', city)
+    }
+    return request<MapGeocodeResult>(`/map/geocode?${params.toString()}`)
+  },
+
+  reverseGeocode: async (lng: number, lat: number, radius = 1000): Promise<MapRegeocodeResult> => {
+    const params = new URLSearchParams({
+      lng: String(lng),
+      lat: String(lat),
+      radius: String(radius),
+    })
+    return request<MapRegeocodeResult>(`/map/reverse-geocode?${params.toString()}`)
+  },
+}

@@ -101,16 +101,17 @@ export function BoxSelectInteraction() {
     useStore.setState({ selectedBuildingIds: selectedIds, editorOpen: false })
   }, [isBuildingInBox, setBoxSelecting, setBoxSelectStart, setBoxSelectEnd])
 
-  /** Alt+左键 且 非地貌编辑模式 且 非测量模式 */
+  /** Alt+左键 且 非地貌编辑模式 且 非测量模式 且 非道路绘制模式 */
   const shouldActivate = useCallback((e: PointerEvent) => {
     const state = useStore.getState()
-    const result = e.altKey && e.button === 0 && !state.terrainEditor.enabled && !state.measurementTool.enabled
+    const result = e.altKey && e.button === 0 && !state.terrainEditor.enabled && !state.measurementTool.enabled && !state.roadEditor.enabled
     
     console.log(LOG_PREFIX, 'shouldActivate:', {
       altKey: e.altKey,
       button: e.button,
       terrainEnabled: state.terrainEditor.enabled,
       measurementEnabled: state.measurementTool.enabled,
+      roadEnabled: state.roadEditor.enabled,
       result
     })
     

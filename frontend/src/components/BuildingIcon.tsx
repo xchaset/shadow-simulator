@@ -92,11 +92,7 @@ const ICON_MAP: Record<string, ReactNode> = {
       <path d="M7,12 L12,4 L17,12 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
     </svg>
   ),
-  river: (
-    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
-      <path d="M0,8 Q8,6 12,10 Q16,14 24,12 Q16,16 12,12 Q8,8 0,10 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.5" />
-    </svg>
-  ),
+
   'ai-circular': (
     <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
       <circle cx="12" cy="12" r="9" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
@@ -273,6 +269,261 @@ const ICON_MAP: Record<string, ReactNode> = {
       <line x1="12" y1="9" x2="15" y2="15" stroke="currentColor" strokeWidth="1" />
       <rect x="0" y="16.5" width="2" height="6" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
       <rect x="22" y="16.5" width="2" height="6" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+    </svg>
+  ),
+  'basketball-court': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="4" width="20" height="16" stroke="currentColor" fill="currentColor" fillOpacity="0.2" strokeWidth="1.5" />
+      <line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="2.5" stroke="currentColor" fill="none" strokeWidth="1.2" />
+      <path d="M2,8 L5,8 L5,16 L2,16" stroke="currentColor" fill="none" strokeWidth="1.2" />
+      <path d="M22,8 L19,8 L19,16 L22,16" stroke="currentColor" fill="none" strokeWidth="1.2" />
+      <circle cx="4" cy="12" r="1.2" stroke="currentColor" fill="none" strokeWidth="1" />
+      <circle cx="20" cy="12" r="1.2" stroke="currentColor" fill="none" strokeWidth="1" />
+    </svg>
+  ),
+  'football-field': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="3" width="20" height="18" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" fill="none" strokeWidth="1.2" />
+      <rect x="2" y="8" width="4" height="8" stroke="currentColor" fill="none" strokeWidth="1.2" />
+      <rect x="18" y="8" width="4" height="8" stroke="currentColor" fill="none" strokeWidth="1.2" />
+      <rect x="2" y="10" width="2" height="4" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="20" y="10" width="2" height="4" stroke="currentColor" fill="none" strokeWidth="1" />
+      <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+      <circle cx="4" cy="12" r="0.5" fill="currentColor" />
+      <circle cx="20" cy="12" r="0.5" fill="currentColor" />
+    </svg>
+  ),
+  'tennis-court': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="3" y="2" width="18" height="20" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="5" y="2" width="14" height="20" stroke="currentColor" fill="none" strokeWidth="1.2" />
+      <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="5" y1="6" x2="19" y2="6" stroke="currentColor" strokeWidth="1" />
+      <line x1="5" y1="18" x2="19" y2="18" stroke="currentColor" strokeWidth="1" />
+      <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" strokeWidth="0.8" strokeDasharray="1,1" />
+    </svg>
+  ),
+  'gymnasium': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M2,10 L12,3 L22,10 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.5" />
+      <rect x="3" y="10" width="18" height="11" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="10" y="14" width="4" height="7" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1.2" />
+      <rect x="5" y="11" width="2" height="3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="8" y="11" width="2" height="3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="14" y="11" width="2" height="3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="17" y="11" width="2" height="3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  ),
+
+  // ─── 车辆类型图标 ──────────────────────────────────────────────
+  car: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="3" y="12" width="18" height="7" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="7" y="7" width="10" height="5" rx="0.5" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <circle cx="7" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="17" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="7" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="17" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="4" y="13" width="2" height="1.5" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <rect x="18" y="13" width="1.5" height="1" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+    </svg>
+  ),
+  suv: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="11" width="20" height="8" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="6" y="5" width="12" height="6" rx="0.5" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="2" y="5" width="4" height="1" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <circle cx="6" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="18" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="6" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="18" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="3" y="12" width="2.5" height="2" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <rect x="18.5" y="12" width="2" height="1.5" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+    </svg>
+  ),
+  van: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="9" width="20" height="10" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="6" y="5" width="16" height="4" rx="0.5" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <line x1="10" y1="5" x2="10" y2="19" stroke="currentColor" strokeWidth="1.2" strokeOpacity="0.5" />
+      <rect x="10" y="9" width="1" height="10" stroke="currentColor" fill="none" strokeWidth="1" />
+      <circle cx="6" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="18" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="6" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="18" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="3" y="10" width="2.5" height="2" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+    </svg>
+  ),
+  truck: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="8" width="10" height="11" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="4" y="4" width="6" height="4" rx="0.5" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="12" y="10" width="10" height="9" stroke="currentColor" fill="currentColor" fillOpacity="0.25" strokeWidth="1.5" />
+      <rect x="12" y="10" width="10" height="0.5" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <circle cx="5" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="14" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="19" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="5" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="14" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="19" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="3" y="9" width="2.5" height="2" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+    </svg>
+  ),
+  bus: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="2" y="6" width="20" height="13" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="3" y="7" width="5" height="3" rx="0.3" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.2" />
+      <rect x="9" y="7" width="3" height="4" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="13" y="7" width="3" height="4" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="17" y="7" width="3" height="4" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="8" y1="11" x2="8" y2="19" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="8" y="11" width="2" height="8" stroke="currentColor" fill="none" strokeWidth="1" />
+      <circle cx="6" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="18" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="6" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="18" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  ),
+  'city-bus': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="1" y="7" width="22" height="12" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="2" y="8" width="4" height="3" rx="0.3" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.2" />
+      <rect x="7" y="8" width="2.5" height="3.5" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="10.5" y="8" width="2.5" height="3.5" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="14.5" y="8" width="2.5" height="3.5" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="18" y="8" width="2.5" height="3.5" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="6.5" y1="11.5" x2="6.5" y2="19" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="6.5" y="11.5" width="2" height="7.5" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="13.5" y1="11.5" x2="13.5" y2="19" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="13.5" y="11.5" width="2" height="7.5" stroke="currentColor" fill="none" strokeWidth="1" />
+      <circle cx="5" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="12" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="19" cy="19" r="2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="5" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="12" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="19" cy="19" r="0.8" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="3" y="5" width="6" height="1.5" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+    </svg>
+  ),
+  train: (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="1" y="7" width="22" height="12" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <rect x="3" y="8" width="4" height="3" rx="0.3" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.2" />
+      <rect x="2" y="4" width="3" height="3" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <line x1="8" y1="7" x2="8" y2="19" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.6" />
+      <line x1="14" y1="7" x2="14" y2="19" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.6" />
+      <rect x="9" y="8" width="4" height="4" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="15" y="8" width="4" height="4" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="19" y="8" width="3" height="4" rx="0.3" stroke="currentColor" fill="none" strokeWidth="1" />
+      <circle cx="5" cy="19" r="1.8" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="11" cy="19" r="1.8" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="17" cy="19" r="1.8" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="21" cy="19" r="1.8" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1.5" />
+      <circle cx="5" cy="19" r="0.7" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="11" cy="19" r="0.7" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="17" cy="19" r="0.7" fill="none" stroke="currentColor" strokeWidth="1" />
+      <circle cx="21" cy="19" r="0.7" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="0" y="9" width="1" height="3" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+    </svg>
+  ),
+
+  // ─── 船舶类型图标 ──────────────────────────────────────────────
+  'cargo-ship': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M3,16 Q3,20 12,20 Q21,20 21,16 L21,14 L3,14 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <polygon points="21,14 23,11 21,9" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="4" y="10" width="12" height="4" stroke="currentColor" fill="currentColor" fillOpacity="0.25" strokeWidth="1.2" />
+      <rect x="17" y="6" width="4" height="8" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.2" />
+      <rect x="18" y="7" width="2.5" height="6" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="18" y1="9" x2="20.5" y2="9" stroke="currentColor" strokeWidth="1" />
+      <line x1="18" y1="11" x2="20.5" y2="11" stroke="currentColor" strokeWidth="1" />
+      <rect x="17.5" y="3" width="2" height="3" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <line x1="18.5" y1="3" x2="18.5" y2="0" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="18.5" cy="0.5" r="0.8" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1" />
+    </svg>
+  ),
+  'container-ship': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M2,17 Q2,21 12,21 Q22,21 22,17 L22,15 L2,15 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <polygon points="22,15 24,11 22,9" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="4" y="9" width="12" height="6" stroke="currentColor" fill="currentColor" fillOpacity="0.2" strokeWidth="1" />
+      <rect x="4" y="9" width="3" height="6" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="7" y="9" width="3" height="6" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="10" y="9" width="3" height="6" stroke="currentColor" fill="none" strokeWidth="1" />
+      <rect x="13" y="9" width="3" height="6" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="4" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="1" />
+      <rect x="18" y="5" width="4" height="10" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.2" />
+      <rect x="19" y="6" width="2.5" height="8" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="19" y1="8" x2="21.5" y2="8" stroke="currentColor" strokeWidth="1" />
+      <line x1="19" y1="10" x2="21.5" y2="10" stroke="currentColor" strokeWidth="1" />
+      <line x1="19" y1="12" x2="21.5" y2="12" stroke="currentColor" strokeWidth="1" />
+      <rect x="18.5" y="2" width="2.5" height="3" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <rect x="21" y="2" width="1.5" height="3" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+    </svg>
+  ),
+  'cruise-ship': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M2,17 Q2,21 12,21 Q22,21 22,17 L22,16 L2,16 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <polygon points="22,16 24,12 22,10" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="4" y="10" width="14" height="6" stroke="currentColor" fill="currentColor" fillOpacity="0.25" strokeWidth="1.2" />
+      <rect x="5" y="7" width="12" height="3" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.2" />
+      <rect x="6" y="5" width="8" height="2" stroke="currentColor" fill="currentColor" fillOpacity="0.35" strokeWidth="1.2" />
+      <rect x="16" y="4" width="4" height="12" stroke="currentColor" fill="currentColor" fillOpacity="0.35" strokeWidth="1.2" />
+      <rect x="17" y="5" width="2.5" height="10" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="17" y1="7.5" x2="19.5" y2="7.5" stroke="currentColor" strokeWidth="1" />
+      <line x1="17" y1="10" x2="19.5" y2="10" stroke="currentColor" strokeWidth="1" />
+      <line x1="17" y1="12.5" x2="19.5" y2="12.5" stroke="currentColor" strokeWidth="1" />
+      <rect x="15" y="1" width="3" height="4" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="1" />
+      <line x1="16.5" y1="1" x2="16.5" y2="-2" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="16.5" cy="-1.5" r="1" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1" />
+      <ellipse cx="10" cy="14" rx="2.5" ry="0.8" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1" />
+    </svg>
+  ),
+  'pleasure-boat': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <path d="M3,17 Q3,20 12,20 Q21,20 21,17 L21,15 L3,15 Z" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <polygon points="21,15 23,11 21,9" stroke="currentColor" fill="currentColor" fillOpacity="0.4" strokeWidth="1.5" />
+      <rect x="5" y="12" width="8" height="3" stroke="currentColor" fill="currentColor" fillOpacity="0.25" strokeWidth="1.2" />
+      <rect x="6" y="9" width="5" height="3" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.2" />
+      <rect x="7" y="10" width="3" height="2" stroke="currentColor" fill="none" strokeWidth="1" />
+      <line x1="9" y1="9" x2="9" y2="6" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="9" y1="6" x2="7" y2="8" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="9" y1="6" x2="11" y2="8" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="2" y="14" width="1.5" height="2" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1" />
+      <circle cx="7" cy="19" r="1.2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.5" />
+      <circle cx="15" cy="19" r="1.2" stroke="currentColor" fill="none" strokeWidth="1" strokeOpacity="0.5" />
+    </svg>
+  ),
+
+  // ─── 交通设施类型图标 ──────────────────────────────────────────────
+  'traffic-light': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="10" y="14" width="4" height="8" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.5" />
+      <rect x="8" y="4" width="8" height="10" rx="1" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <circle cx="12" cy="6" r="1.2" stroke="currentColor" fill="currentColor" fillOpacity="0.8" strokeWidth="1" />
+      <circle cx="12" cy="9" r="1.2" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1" />
+      <circle cx="12" cy="12" r="1.2" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1" />
+    </svg>
+  ),
+  'street-sign': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="11" y="10" width="2" height="12" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.5" />
+      <rect x="4" y="4" width="16" height="6" rx="0.5" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.5" />
+      <line x1="7" y1="7" x2="17" y2="7" stroke="currentColor" strokeWidth="1" strokeOpacity="0.5" />
+      <line x1="7" y1="8.5" x2="14" y2="8.5" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.4" />
+    </svg>
+  ),
+  'street-lamp': (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">
+      <rect x="11" y="6" width="2" height="16" stroke="currentColor" fill="currentColor" fillOpacity="0.5" strokeWidth="1.5" />
+      <line x1="12" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="16" y="6" width="4" height="3" rx="0.3" stroke="currentColor" fill="currentColor" fillOpacity="0.3" strokeWidth="1.2" />
+      <rect x="16.5" y="6.5" width="3" height="2" rx="0.2" stroke="currentColor" fill="currentColor" fillOpacity="0.6" strokeWidth="0.8" />
     </svg>
   ),
 }

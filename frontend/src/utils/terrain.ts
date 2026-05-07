@@ -1,14 +1,8 @@
 import type { TerrainData, LakeRegion } from '../types'
 
 const TERRAIN_RESOLUTION = 128
+const DEFAULT_TERRAIN_COLOR: [number, number, number] = [139 / 255, 115 / 255, 85 / 255]
 
-/**
- * 重新映射地形数据，使其在画布尺寸变化时保持在相同的世界位置
- * @param terrainData 原始地形数据
- * @param oldCanvasSize 旧画布尺寸
- * @param newCanvasSize 新画布尺寸
- * @returns 重新映射后的地形数据
- */
 export function remapTerrainData(
   terrainData: TerrainData,
   oldCanvasSize: number,
@@ -22,27 +16,21 @@ export function remapTerrainData(
 
   const newHeights = new Float32Array(resolution * resolution)
   const newWaterMask = terrainData.waterMask ? new Uint8Array(resolution * resolution) : undefined
+  const newColorData = terrainData.colorData ? new Float32Array(resolution * resolution * 3) : undefined
 
-  // 遍历新地形的每个顶点，计算对应的世界坐标
-  // 然后根据旧画布尺寸，从旧地形数据中采样高度
   for (let iy = 0; iy < resolution; iy++) {
     for (let ix = 0; ix < resolution; ix++) {
       const newIdx = iy * resolution + ix
 
-      // 计算新地形中该索引对应的世界坐标
-      // u, v 范围: 0 ~ 1
       const u = ix / (resolution - 1)
       const v = iy / (resolution - 1)
 
-      // 世界坐标
       const worldX = (u - 0.5) * newCanvasSize
       const worldZ = (v - 0.5) * newCanvasSize
 
-      // 计算这个世界坐标在旧画布中的相对位置
       const oldU = (worldX + oldHalfSize) / oldCanvasSize
       const oldV = (worldZ + oldHalfSize) / oldCanvasSize
 
-      // 如果在旧画布范围内，进行双线性插值采样
       if (oldU >= 0 && oldU <= 1 && oldV >= 0 && oldV <= 1) {
         const fx = oldU * (resolution - 1)
         const fy = oldV * (resolution - 1)
@@ -55,7 +43,6 @@ export function remapTerrainData(
         const tx = fx - x0
         const ty = fy - y0
 
-        // 高度双线性插值
         const heights = terrainData.heights as Float32Array
         const h00 = heights[y0 * resolution + x0]
         const h10 = heights[y0 * resolution + x1]
@@ -68,11 +55,8 @@ export function remapTerrainData(
 
         newHeights[newIdx] = height
 
-        // 水标记双线性插值（取最近邻或阈值插值）
         if (newWaterMask && terrainData.waterMask) {
           const waterMask = terrainData.waterMask as Uint8Array
-          // 对于水标记，使用最近邻插值或简单阈值
-          // 这里使用简单的方式：如果周围超过一半是水，则标记为水
           let waterCount = 0
           if (waterMask[y0 * resolution + x0]) waterCount++
           if (waterMask[y0 * resolution + x1]) waterCount++
@@ -81,11 +65,57 @@ export function remapTerrainData(
 
           newWaterMask[newIdx] = waterCount >= 2 ? 1 : 0
         }
+
+        if (newColorData && terrainData.colorData) {
+          const colorData = terrainData.colorData as Float32Array
+          
+          const idx00 = (y0 * resolution + x0) * 3
+          const idx10 = (y0 * resolution + x1) * 3
+          const idx01 = (y1 * resolution + x0) * 3
+          const idx11 = (y1 * resolution + x1) * 3
+
+          const r00 = colorData[idx00]
+          const r10 = colorData[idx10]
+          const r01 = colorData[idx01]
+          const r11 = colorData[idx11]
+
+          const g00 = colorData[idx00 + 1]
+          const g10 = colorData[idx10 + 1]
+          const g01 = colorData[idx01 + 1]
+          const g11 = colorData[idx11 + 1]
+
+          const b00 = colorData[idx00 + 2]
+          const b10 = colorData[idx10 + 2]
+          const b01 = colorData[idx01 + 2]
+          const b11 = colorData[idx11 + 2]
+
+          const r0 = r00 * (1 - tx) + r10 * tx
+          const r1 = r01 * (1 - tx) + r11 * tx
+          const r = r0 * (1 - ty) + r1 * ty
+
+          const g0 = g00 * (1 - tx) + g10 * tx
+          const g1 = g01 * (1 - tx) + g11 * tx
+          const g = g0 * (1 - ty) + g1 * ty
+
+          const b0 = b00 * (1 - tx) + b10 * tx
+          const b1 = b01 * (1 - tx) + b11 * tx
+          const b = b0 * (1 - ty) + b1 * ty
+
+          const newColorIdx = newIdx * 3
+          newColorData[newColorIdx] = r
+          newColorData[newColorIdx + 1] = g
+          newColorData[newColorIdx + 2] = b
+        }
       } else {
-        // 超出旧画布范围，保持默认值（高度为0，无水）
         newHeights[newIdx] = 0
         if (newWaterMask) {
           newWaterMask[newIdx] = 0
+        }
+        if (newColorData) {
+          const newColorIdx = newIdx * 3
+          newColorData[newColorIdx] = DEFAULT_TERRAIN_COLOR[0]
+          newColorData[newColorIdx + 1] = DEFAULT_TERRAIN_COLOR[1]
+          newColorData[newColorIdx + 2] = DEFAULT_TERRAIN_COLOR[2]
         }
       }
     }
@@ -96,17 +126,10 @@ export function remapTerrainData(
     heights: newHeights,
     maxHeight: terrainData.maxHeight,
     waterMask: newWaterMask,
+    colorData: newColorData,
   }
 }
 
-/**
- * 根据世界坐标采样地形高度
- * @param wx 世界 X 坐标
- * @param wz 世界 Z 坐标
- * @param terrainData 地形数据
- * @param canvasSize 画布尺寸
- * @returns 该位置的地形高度，无地形时返回 0
- */
 export function getTerrainHeightAt(
   wx: number,
   wz: number,
@@ -119,7 +142,6 @@ export function getTerrainHeightAt(
   const u = (wx + halfSize) / canvasSize
   const v = (wz + halfSize) / canvasSize
 
-  // 超出画布范围
   if (u < 0 || u > 1 || v < 0 || v > 1) return 0
 
   const resolution = terrainData.resolution
@@ -136,22 +158,17 @@ export function getTerrainHeightAt(
 
   const heights = terrainData.heights as Float32Array
 
-  // 双线性插值
   const h00 = heights[y0 * resolution + x0]
   const h10 = heights[y0 * resolution + x1]
   const h01 = heights[y1 * resolution + x0]
   const h11 = heights[y1 * resolution + x1]
 
   const h0 = h00 * (1 - tx) + h10 * tx
-  const h1 = h01 * (1 - tx) + h11 * tx
+  const h1 = h01 * (1 - tx) + h10 * tx
 
   return h0 * (1 - ty) + h1 * ty
 }
 
-/**
- * 批量更新建筑高度以贴合地形
- * @returns 是否需要更新（地形存在且有建筑）
- */
 export function updateBuildingHeightsForTerrain(
   buildings: any[],
   terrainData: TerrainData | null,
